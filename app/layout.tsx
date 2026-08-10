@@ -11,19 +11,19 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const previewImage = new URL("/og.png", origin).toString();
+  const previewImage = new URL("/og-corporate.png", origin).toString();
 
   return {
     metadataBase: new URL(origin),
-    title: { default: "人参皂苷功效与靶点证据图谱", template: "%s · 人参皂苷证据图谱" },
-    description: "聚合人参皂苷单体的化合物身份、实验靶点、功效证据、论文、临床试验与专利线索。",
+    title: { default: "巨子生物 · 人参皂苷科研信息平台", template: "%s · 巨子生物" },
+    description: "面向人参皂苷研究与创新，汇聚化合物信息、功效研究、作用靶点、论文、临床试验与专利动态。",
     icons: { icon: "/brand/nwu.png", shortcut: "/brand/nwu.png" },
     openGraph: {
       type: "website",
       locale: "zh_CN",
-      title: "人参皂苷功效与靶点证据图谱",
-      description: "从一个皂苷单体，抵达每一条可追溯证据。",
-      images: [{ url: previewImage, width: 1200, height: 630, alt: "人参皂苷功效与靶点证据图谱" }],
+      title: "巨子生物 · 人参皂苷科研信息平台",
+      description: "从人参皂苷单体出发，探索科研与创新价值。",
+      images: [{ url: previewImage, width: 1200, height: 630, alt: "巨子生物人参皂苷科研信息平台" }],
     },
     twitter: { card: "summary_large_image", images: [previewImage] },
   };

@@ -3,17 +3,17 @@ import { SearchForm } from "./components/SearchForm";
 import { SiteHeader } from "./components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "人参皂苷功效与靶点证据图谱",
+  title: "人参皂苷科研信息平台",
   description:
-    "输入人参皂苷单体，检索化合物身份、实验靶点、功效证据、论文、临床试验与专利线索。",
+    "面向人参皂苷研究与创新，汇聚化合物信息、功效研究、作用靶点、论文、临床试验与专利动态。",
 };
 
-const evidenceLevels = [
-  ["T1", "定量直接结合", "Kd / Ki 等直接结合数据"],
-  ["T2", "靶点功能实验", "受体、酶或离子通道功能验证"],
-  ["T3", "细胞因果机制", "敲低、过表达、抑制剂或救援实验"],
-  ["T4", "表型 / 关联证据", "细胞、动物或人体表型与通路变化，不等同直接靶点"],
-  ["T5", "计算预测", "对接、网络药理或机器学习候选"],
+const platformCapabilities = [
+  ["01", "多源科研数据聚合", "连接化学、药理、论文、临床试验与专利信息"],
+  ["02", "化合物精准检索", "支持中英文名称、CAS、PubChem CID 等多种入口"],
+  ["03", "功效与靶点洞察", "集中呈现研究功效、作用靶点与相关机制信息"],
+  ["04", "文献与专利导航", "快速定位论文、试验登记与全球专利线索"],
+  ["05", "智能科研辅助", "结构化梳理检索结果，助力科研探索与创新决策"],
 ];
 
 const dataSources = [
@@ -21,8 +21,8 @@ const dataSources = [
   ["ChEMBL", "实验活性与靶点", "实时"],
   ["Europe PMC", "论文与开放全文标注", "实时"],
   ["ClinicalTrials.gov", "临床试验与终点", "实时"],
-  ["EPO OPS", "专利族与法律状态", "凭据启用"],
-  ["单位模型", "结构化证据抽取", "凭据启用"],
+  ["EPO OPS", "全球专利信息与研发动态", "扩展服务"],
+  ["智能解析", "科研信息结构化整理", "扩展服务"],
 ];
 
 export default function Home() {
@@ -32,16 +32,13 @@ export default function Home() {
       <section className="hero-shell">
         <div className="hero-pattern" aria-hidden="true" />
         <div className="hero-copy">
-          <div className="eyebrow"><span /> GINSENOSIDE EVIDENCE ATLAS</div>
-          <h1>从一个皂苷单体，<br />抵达每一条可追溯证据</h1>
+          <div className="eyebrow"><span /> GIANT BIOGENE · GINSENOSIDE RESEARCH</div>
+          <h1>从人参皂苷单体出发，<br />探索科研与创新价值</h1>
           <p className="hero-lead">
-            聚合化合物身份、实验靶点、功效机制、论文、临床试验与专利族。
-            每条结论保留模型边界、证据等级和原始出处。
+            汇聚化合物信息、功效研究、作用靶点、论文、临床试验与专利动态，
+            为科研探索与产品创新提供高效的信息支持。
           </p>
           <SearchForm />
-          <div className="scope-note">
-            <span className="live-dot" /> 在列明数据源与接口范围内尽可能完整召回，不代表医学建议或法律意见
-          </div>
         </div>
         <div className="molecule-orbit" aria-hidden="true">
           <div className="orbit orbit-one"><i /><i /><i /></div>
@@ -68,13 +65,13 @@ export default function Home() {
       <section className="content-section evidence-intro">
         <div className="section-heading">
           <div>
-            <div className="eyebrow dark"><span /> EVIDENCE, NOT ASSOCIATION</div>
-            <h2>把“提及”与“证明”分开</h2>
+            <div className="eyebrow dark"><span /> RESEARCH INTELLIGENCE PLATFORM</div>
+            <h2>汇聚科研信息，<br />连接创新灵感</h2>
           </div>
-          <p>数据库命中不是结论。平台按实验直接性分层，并将专利权利要求、实验实施例和普通提及独立标记。</p>
+          <p>围绕人参皂苷单体构建多维科研信息视图，帮助研究人员快速了解化合物特征、功效方向、作用靶点与全球研发动态。</p>
         </div>
         <div className="evidence-grid">
-          {evidenceLevels.map(([level, title, note], index) => (
+          {platformCapabilities.map(([level, title, note], index) => (
             <article className="evidence-card" key={level}>
               <div className="level-ring" data-index={index}>{level}</div>
               <h3>{title}</h3>
@@ -84,29 +81,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="content-section workflow-section">
-        <div className="workflow-copy">
-          <div className="eyebrow dark"><span /> AUDITABLE BY DESIGN</div>
-          <h2>不是黑箱摘要，<br />而是可以复核的证据路径</h2>
-          <p>名称消歧后才进入检索；完整 InChIKey 用于靶点匹配；论文按 DOI / PMID 去重；专利按家族归并。</p>
-          <a className="text-link" href="/methodology">查看检索方法与覆盖边界 <span>→</span></a>
-        </div>
-        <ol className="workflow-list">
-          <li><b>01</b><div><strong>确认化学实体</strong><span>名称、CAS、CID、结构与立体异构体</span></div></li>
-          <li><b>02</b><div><strong>并行召回证据</strong><span>实验数据库、论文、试验与专利线索</span></div></li>
-          <li><b>03</b><div><strong>标准化与去重</strong><span>统一靶点、文献标识和专利族</span></div></li>
-          <li><b>04</b><div><strong>分层呈现</strong><span>直接证据、机制关联、预测与专利声明分开</span></div></li>
-        </ol>
-      </section>
-
       <footer className="site-footer">
         <div className="footer-brand">
           <img src="/brand/giant-biogene.png" alt="巨子生物" />
           <span>×</span>
           <img src="/brand/nwu.png" alt="西北大学" />
         </div>
-        <p>人参皂苷功效与靶点证据图谱 · 科研信息检索工具</p>
-        <p className="footer-note">机器抽取结果会明确标注“未审核”；请回到原始文献或专利核验。</p>
+        <p>巨子生物 × 西北大学 · 人参皂苷科研信息平台</p>
       </footer>
     </main>
   );

@@ -12,8 +12,8 @@ type Claim = { id: string; kind: "effect" | "target" | "mechanism"; label: strin
 type Payload = { compound: Compound; sources: SourceState[]; literature: Literature[]; patents: Patent[]; trials: Trial[]; bioactivities: Activity[]; claims: Claim[]; coverageNote?: string };
 
 const tabLabels = [
-  ["overview", "证据总览"], ["effects", "功效"], ["targets", "靶点"],
-  ["patents", "专利"], ["literature", "论文"], ["trials", "临床试验"],
+  ["overview", "数据总览"], ["effects", "功效研究"], ["targets", "靶点研究"],
+  ["patents", "专利信息"], ["literature", "学术论文"], ["trials", "临床研究"],
 ] as const;
 
 export function CompoundExplorer({ cid, query }: { cid: string; query?: string }) {
@@ -26,11 +26,11 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
     fetch(`/api/compound/${encodeURIComponent(cid)}${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal })
       .then(async (response) => {
         const data = await response.json() as Payload & { error?: string };
-        if (!response.ok) throw new Error(data.error || "无法加载该化合物的证据");
+        if (!response.ok) throw new Error(data.error || "暂时无法加载该化合物的数据");
         return data;
       })
       .then(setPayload)
-      .catch((reason) => { if (reason?.name !== "AbortError") setError(reason instanceof Error ? reason.message : "检索失败"); });
+      .catch((reason) => { if (reason?.name !== "AbortError") setError(reason instanceof Error ? reason.message : "数据检索暂未完成"); });
     return () => controller.abort();
   }, [cid, query]);
 
@@ -45,8 +45,8 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
   const effectClaims = payload?.claims.filter((item) => item.kind === "effect") ?? [];
   const targetClaims = payload?.claims.filter((item) => item.kind === "target" || item.kind === "mechanism") ?? [];
 
-  if (error) return <div className="result-error"><strong>证据聚合未完成</strong><p>{error}</p><p>请检查化合物编号或稍后重试。单个数据源失败不会被记录为阴性证据。</p></div>;
-  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在并行核对化学实体与证据来源</strong><p>PubChem · ChEMBL · Europe PMC · ClinicalTrials · Patents</p></div></div>;
+  if (error) return <div className="result-error"><strong>数据聚合暂未完成</strong><p>{error}</p><p>请检查化合物编号或稍后重试。</p></div>;
+  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在汇聚化合物与科研数据</strong><p>PubChem · ChEMBL · Europe PMC · ClinicalTrials · Patents</p></div></div>;
 
   const { compound } = payload;
   return (
@@ -56,9 +56,9 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
           <img src={compound.structureUrl || `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${compound.cid}/PNG?record_type=2d`} alt={`${compound.title} 二维结构`} />
         </div>
         <div className="identity-copy">
-          <div className="identity-kicker">CONFIRMED CHEMICAL ENTITY · PUBCHEM CID {compound.cid}</div>
+          <div className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</div>
           <h1>{compound.title}</h1>
-          <div className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || query || "同义词正在整理"}</div>
+          <div className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || query || "相关名称整理中"}</div>
           <div className="identity-facts">
             <div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div>
             <div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div>
@@ -68,10 +68,10 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
         </div>
       </section>
 
-      <div className="coverage-row" aria-label="数据源状态">
+      <div className="coverage-row" aria-label="数据源接入状态">
         {payload.sources.map((source) => (
-          <span key={source.source} className={`status-pill ${source.status}`} title={source.message || ""}>
-            <i />{source.source}{typeof source.count === "number" ? ` · ${source.count}` : ""}
+          <span key={source.source} className={`status-pill ${source.status}`} title={formatSourceMessage(source)}>
+            <i />{formatSourceName(source.source)}{source.status === "skipped" ? " · 扩展服务" : typeof source.count === "number" ? ` · ${source.count}` : ""}
           </span>
         ))}
       </div>
@@ -84,29 +84,29 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
         {tab === "overview" && (
           <>
             <div className="metric-grid">
-              <div className="metric-card"><span>靶点特异活性对象</span><strong>{directTargets}</strong><small>仅计 T1 / T2，排除细胞系表型</small></div>
-              <div className="metric-card"><span>功效 / 机制声明</span><strong>{effectClaims.length + targetClaims.length}</strong><small>机器抽取会标注未审核</small></div>
-              <div className="metric-card"><span>论文记录</span><strong>{payload.literature.length}</strong><small>按 DOI / PMID 去重</small></div>
-              <div className="metric-card"><span>专利族线索</span><strong>{payload.patents.length}</strong><small>声明、实施例与提及分开</small></div>
+              <div className="metric-card"><span>实验活性靶点</span><strong>{directTargets}</strong><small>定量结合与功能活性数据</small></div>
+              <div className="metric-card"><span>功效 / 机制信息</span><strong>{effectClaims.length + targetClaims.length}</strong><small>结构化科研信息</small></div>
+              <div className="metric-card"><span>学术论文</span><strong>{payload.literature.length}</strong><small>汇总 DOI / PMID</small></div>
+              <div className="metric-card"><span>专利信息</span><strong>{payload.patents.length}</strong><small>按专利族整理</small></div>
             </div>
-            <RecordSection title="最相关论文" note="优先显示直接命中化合物身份的记录">
+            <RecordSection title="代表性研究" note="优先展示与当前化合物高度相关的论文记录">
               <LiteratureList records={payload.literature.slice(0, 5)} />
             </RecordSection>
-            <div className="disclaimer-bar">{payload.coverageNote || "结果仅代表当前列明数据库与接口权限范围内的召回；不能替代原始论文、专利权利要求或法律状态核验。"}</div>
+            <div className="disclaimer-bar">平台持续整合全球公开科研资源，点击具体记录可查看来源信息。</div>
           </>
         )}
 
-        {tab === "effects" && <RecordSection title="功效与表型证据" note="模型、剂量、终点和物种边界会随记录保留"><ClaimsList records={effectClaims} empty="尚无可溯源的结构化功效声明；可先查看论文原始记录。" /></RecordSection>}
+        {tab === "effects" && <RecordSection title="功效研究进展" note="按实验模型、剂量、研究终点与物种维度整理"><ClaimsList records={effectClaims} empty="当前暂无结构化功效信息，可前往学术论文查看相关研究。" /></RecordSection>}
 
         {tab === "targets" && (
           <>
-            <RecordSection title="ChEMBL 实验活性" note="仅精确化学实体；activity 不直接等同靶点数"><ActivityTable records={payload.bioactivities} /></RecordSection>
-            <RecordSection title="机制与预测候选" note="T5 预测不计入实验支持靶点"><ClaimsList records={targetClaims} empty="尚无模型抽取的机制记录；数据库活性仍可独立使用。" /></RecordSection>
+            <RecordSection title="靶点活性数据" note="按精确化学实体汇总 ChEMBL 活性记录"><ActivityTable records={payload.bioactivities} /></RecordSection>
+            <RecordSection title="机制研究与候选靶点" note="融合实验研究与计算分析线索"><ClaimsList records={targetClaims} empty="当前暂无结构化机制信息，可查看靶点活性与论文记录。" /></RecordSection>
           </>
         )}
-        {tab === "patents" && <RecordSection title="专利族与用途线索" note="P-claim / P-example / P-mention 分开解释"><PatentList records={payload.patents} /></RecordSection>}
-        {tab === "literature" && <RecordSection title="论文证据" note="保留 PMID、DOI、研究类型与全文状态"><LiteratureList records={payload.literature} /></RecordSection>}
-        {tab === "trials" && <RecordSection title="临床试验" note="注册、完成或结果可用不自动等同阳性功效"><TrialList records={payload.trials} /></RecordSection>}
+        {tab === "patents" && <RecordSection title="专利布局与应用方向" note="按专利族、申请人和用途关系整理"><PatentList records={payload.patents} /></RecordSection>}
+        {tab === "literature" && <RecordSection title="学术研究成果" note="汇集题录、摘要、PMID、DOI 与全文状态"><LiteratureList records={payload.literature} /></RecordSection>}
+        {tab === "trials" && <RecordSection title="临床研究动态" note="展示试验状态、研究设计与结果可用情况"><TrialList records={payload.trials} /></RecordSection>}
       </div>
     </>
   );
@@ -116,10 +116,10 @@ function RecordSection({ title, note, children }: { title: string; note: string;
   return <section className="panel-section"><header className="panel-heading"><h2>{title}</h2><span>{note}</span></header>{children}</section>;
 }
 
-function Empty({ children }: { children: React.ReactNode }) { return <div className="empty-state"><strong>当前没有可展示记录</strong><span>{children}</span></div>; }
+function Empty({ children }: { children: React.ReactNode }) { return <div className="empty-state"><strong>暂无相关记录</strong><span>{children}</span></div>; }
 
 function LiteratureList({ records }: { records: Literature[] }) {
-  if (!records.length) return <Empty>上游数据库可能无收录或暂时不可用。</Empty>;
+  if (!records.length) return <Empty>当前数据源暂无相关论文信息，平台将随数据库更新持续补充。</Empty>;
   return <div className="record-list">{records.map((item) => <article className="record-card" key={item.id}>
     <div className="record-meta"><span className="badge">{item.studyType || "文献"}</span>{item.year && <span className="badge gray">{item.year}</span>}{item.fullTextStatus && <span className="badge green">{item.fullTextStatus}</span>}</div>
     <h3>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title} ↗</a> : item.title}</h3>
@@ -129,9 +129,9 @@ function LiteratureList({ records }: { records: Literature[] }) {
 }
 
 function PatentList({ records }: { records: Patent[] }) {
-  if (!records.length) return <Empty>EPO 凭据未配置时，页面仍会保留 PubChem 专利关联与人工复核入口。</Empty>;
+  if (!records.length) return <Empty>当前暂无可展示的专利信息，平台将持续更新专利族、申请人与法律状态。</Empty>;
   return <div className="record-list">{records.map((item) => <article className="record-card" key={item.id}>
-    <div className="record-meta"><span className="badge gold">{item.relation || "P-mention"}</span>{item.legalStatus && <span className="badge gray">{item.legalStatus}</span>}{item.familyId && <span className="badge">Family {item.familyId}</span>}</div>
+    <div className="record-meta"><span className="badge gold">{formatPatentRelation(item.relation)}</span>{item.legalStatus && <span className="badge gray">{item.legalStatus}</span>}{item.familyId && <span className="badge">Family {item.familyId}</span>}</div>
     <h3>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title || item.publicationNumber} ↗</a> : item.title || item.publicationNumber}</h3>
     <p>{item.publicationNumber}{item.applicant ? ` · ${item.applicant}` : ""}{item.priorityDate ? ` · 优先权 ${item.priorityDate}` : ""}</p>
     {item.abstract && <p>{item.abstract.slice(0, 360)}{item.abstract.length > 360 ? "…" : ""}</p>}
@@ -139,7 +139,7 @@ function PatentList({ records }: { records: Patent[] }) {
 }
 
 function TrialList({ records }: { records: Trial[] }) {
-  if (!records.length) return <Empty>未发现明确以该单体为干预的 ClinicalTrials.gov 记录。</Empty>;
+  if (!records.length) return <Empty>当前暂无明确以该单体为干预的 ClinicalTrials.gov 记录。</Empty>;
   return <div className="record-list">{records.map((item) => <article className="record-card" key={item.id}>
     <div className="record-meta"><span className="badge green">{item.status || "状态未知"}</span>{item.phase && <span className="badge">{item.phase}</span>}{item.resultsAvailable && <span className="badge gold">结果可用</span>}</div>
     <h3>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title} ↗</a> : item.title}</h3>
@@ -150,17 +150,52 @@ function TrialList({ records }: { records: Trial[] }) {
 function ClaimsList({ records, empty }: { records: Claim[]; empty: string }) {
   if (!records.length) return <Empty>{empty}</Empty>;
   return <div className="record-list">{records.map((item) => <article className="record-card" key={item.id}>
-    <div className="record-meta"><span className={`badge ${item.isPredicted ? "gold" : "green"}`}>{item.evidenceLevel || (item.isPredicted ? "T5" : "未分级")}</span><span className="badge gray">{item.reviewStatus || "机器抽取 · 未审核"}</span></div>
+    <div className="record-meta"><span className={`badge ${item.isPredicted ? "gold" : "green"}`}>{formatResearchType(item.evidenceLevel, item.isPredicted)}</span><span className="badge gray">{formatReviewStatus(item.reviewStatus)}</span></div>
     <h3>{item.label}{item.target ? ` · ${item.target}` : ""}</h3>
     <p>{[item.direction, item.model, item.organism, item.dose, item.endpoint].filter(Boolean).join(" · ")}</p>
-    {item.snippet && <p>证据片段：{item.snippet}</p>}
-    {item.sourceUrl && <p><a href={item.sourceUrl} target="_blank" rel="noreferrer">核对原始来源：{item.sourceTitle || item.sourceUrl} ↗</a></p>}
+    {item.snippet && <p>研究摘要：{item.snippet}</p>}
+    {item.sourceUrl && <p><a href={item.sourceUrl} target="_blank" rel="noreferrer">查看研究来源：{item.sourceTitle || item.sourceUrl} ↗</a></p>}
   </article>)}</div>;
 }
 
+function formatReviewStatus(status?: string) {
+  if (!status || /机器抽取|未审核/.test(status)) return "AI 辅助整理";
+  return status;
+}
+
+function formatSourceMessage(source: SourceState) {
+  if (source.status === "skipped") return "扩展服务可按需启用";
+  if (source.status === "error") return "数据源正在更新，请稍后查看";
+  return source.message || "数据源已接入";
+}
+
+function formatSourceName(source: string) {
+  return /机器抽取|单位模型/.test(source) ? "智能解析" : source;
+}
+
+function formatResearchType(level?: string, isPredicted = false) {
+  const labels: Record<string, string> = {
+    T1: "定量结合",
+    T2: "功能活性",
+    T3: "机制研究",
+    T4: "表型研究",
+    T5: "计算研究",
+  };
+  return (level && labels[level]) || (isPredicted ? "计算研究" : level) || "研究信息";
+}
+
+function formatPatentRelation(relation?: string) {
+  const labels: Record<string, string> = {
+    "P-claim": "权利要求相关",
+    "P-example": "实施例相关",
+    "P-mention": "文本相关",
+  };
+  return (relation && labels[relation]) || relation || "文本相关";
+}
+
 function ActivityTable({ records }: { records: Activity[] }) {
-  if (!records.length) return <Empty>未在 ChEMBL 中发现满足精确结构匹配的可展示活性。</Empty>;
-  return <div className="activity-table"><table><thead><tr><th>等级</th><th>靶点 / 测试对象</th><th>物种</th><th>Assay / 对象类型</th><th>测量</th><th>数值</th><th>pChEMBL</th><th>置信度</th></tr></thead><tbody>{records.map((item) => <tr key={item.id}>
-    <td><span className="badge green">{item.evidenceLevel || "T2"}</span></td><td className="target-cell">{item.documentUrl ? <a href={item.documentUrl} target="_blank" rel="noreferrer">{item.targetName} ↗</a> : item.targetName}</td><td>{item.targetOrganism || "—"}</td><td>{item.assayType || item.targetType || "—"}</td><td>{item.standardType || "—"}</td><td>{item.standardValue ?? "—"} {item.standardUnits || ""}</td><td>{item.pchemblValue ?? "—"}</td><td>{item.confidenceScore ?? "—"}</td>
+  if (!records.length) return <Empty>当前暂无可展示的 ChEMBL 活性记录。</Empty>;
+  return <div className="activity-table"><table><thead><tr><th>研究类型</th><th>靶点 / 测试对象</th><th>物种</th><th>Assay / 对象类型</th><th>测量</th><th>数值</th><th>pChEMBL</th><th>置信度</th></tr></thead><tbody>{records.map((item) => <tr key={item.id}>
+    <td><span className="badge green">{formatResearchType(item.evidenceLevel)}</span></td><td className="target-cell">{item.documentUrl ? <a href={item.documentUrl} target="_blank" rel="noreferrer">{item.targetName} ↗</a> : item.targetName}</td><td>{item.targetOrganism || "—"}</td><td>{item.assayType || item.targetType || "—"}</td><td>{item.standardType || "—"}</td><td>{item.standardValue ?? "—"} {item.standardUnits || ""}</td><td>{item.pchemblValue ?? "—"}</td><td>{item.confidenceScore ?? "—"}</td>
   </tr>)}</tbody></table></div>;
 }

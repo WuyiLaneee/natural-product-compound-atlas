@@ -165,7 +165,7 @@ function mapClaim(record: EvidenceClaim, index: number) {
     snippet: record.source.excerpt,
     sourceTitle: `${record.source.source} · ${record.source.sourceId}`,
     sourceUrl: record.source.sourceUrl,
-    reviewStatus: "机器抽取 · 未审核",
+    reviewStatus: "AI 辅助整理",
     isPredicted: record.evidenceLevel === "T5",
   };
 }
@@ -192,14 +192,14 @@ function mapPayload(aggregation: EvidenceAggregation, fallback: CompoundProfile)
       mapSource("Europe PMC", sourceResults.europePmc),
       mapSource("ClinicalTrials.gov", sourceResults.clinicalTrials),
       mapSource("EPO OPS", sourceResults.epoOps),
-      mapSource("机器抽取", sourceResults.model),
+      mapSource("智能解析", sourceResults.model),
     ],
     literature: aggregation.publications.map(mapPublication),
     patents: aggregation.patents.map(mapPatent),
     trials: aggregation.trials.map(mapTrial),
     bioactivities: aggregation.bioactivities.map(mapActivity),
     claims: aggregation.claims.map(mapClaim),
-    coverageNote: `结果生成于 ${new Date(aggregation.generatedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}；覆盖当前列明数据库与接口权限范围${degraded ? `，${degraded} 个来源为部分、跳过或错误状态` : ""}。记录召回不等于功效成立，机器抽取未经人工审核。`,
+    coverageNote: `结果生成于 ${new Date(aggregation.generatedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}；已汇聚当前接入数据库的可用科研信息${degraded ? `，${degraded} 个来源正在等待更新或扩展接入` : ""}。`,
   };
 }
 
@@ -269,7 +269,7 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
   const rate = await enforceRefreshLimit(request);
   if (rate && !rate.allowed) {
     return Response.json(
-      { error: "实时证据刷新频率过高，请在限流窗口结束后重试。", resetAt: new Date(rate.resetAt).toISOString() },
+      { error: "科研数据更新请求较多，请稍后重试。", resetAt: new Date(rate.resetAt).toISOString() },
       { status: 429, headers: { "retry-after": String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000))) } },
     );
   }
@@ -326,6 +326,6 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知聚合错误";
-    return Response.json({ error: `证据聚合失败：${message}` }, { status: 502 });
+    return Response.json({ error: `科研数据汇聚暂未完成：${message}` }, { status: 502 });
   }
 }
