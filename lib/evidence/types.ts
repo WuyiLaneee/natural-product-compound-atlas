@@ -40,8 +40,13 @@ export type CompoundQueryKind = "cid" | "inchikey" | "name";
 export interface CompoundCandidate {
   cid: number;
   title: string;
+  iupacName?: string;
   molecularFormula?: string;
   molecularWeight?: number;
+  charge?: number;
+  covalentUnitCount?: number;
+  definedAtomStereoCount?: number;
+  undefinedAtomStereoCount?: number;
   canonicalSmiles?: string;
   isomericSmiles?: string;
   inchi?: string;

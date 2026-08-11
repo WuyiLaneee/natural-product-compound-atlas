@@ -3,7 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 
 type SourceState = { source: string; status: "success" | "partial" | "skipped" | "error"; count?: number; message?: string; fetchedAt?: string };
-type Compound = { cid: number; title: string; molecularFormula?: string; molecularWeight?: number | string; inchiKey?: string; isomericSmiles?: string; synonyms?: string[]; structureUrl?: string };
+type Compound = {
+  cid: number;
+  title: string;
+  iupacName?: string;
+  molecularFormula?: string;
+  molecularWeight?: number | string;
+  charge?: number;
+  covalentUnitCount?: number;
+  definedAtomStereoCount?: number;
+  undefinedAtomStereoCount?: number;
+  inchiKey?: string;
+  isomericSmiles?: string;
+  synonyms?: string[];
+  entityNote?: string;
+  structureUrl?: string;
+};
 type Literature = { id: string; title: string; authors?: string[]; year?: number; journal?: string; doi?: string; pmid?: string; abstract?: string; url?: string; studyType?: string; fullTextStatus?: string };
 type Patent = { id: string; title: string; publicationNumber?: string; applicant?: string; priorityDate?: string; relation?: string; legalStatus?: string; abstract?: string; url?: string; familyId?: string };
 type Trial = { id: string; title: string; status?: string; phase?: string; conditions?: string[]; enrollment?: number; intervention?: string; resultsAvailable?: boolean; url?: string };
@@ -80,12 +95,17 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
           <div className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</div>
           <h1>{compound.title}</h1>
           <div className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || query || "相关名称整理中"}</div>
+          {compound.iupacName && <p className="iupac-line"><span>IUPAC</span>{compound.iupacName}</p>}
           <div className="identity-facts">
             <div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div>
             <div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div>
+            <div><span>净电荷</span><strong>{compound.charge ?? "—"}</strong></div>
+            <div><span>共价单元</span><strong>{compound.covalentUnitCount ?? "—"}</strong></div>
             <div><span>InChIKey</span><code>{compound.inchiKey || "—"}</code></div>
+            <div><span>原子立体中心</span><strong>{compound.definedAtomStereoCount !== undefined || compound.undefinedAtomStereoCount !== undefined ? `${compound.definedAtomStereoCount ?? 0} 已定义 · ${compound.undefinedAtomStereoCount ?? 0} 未定义` : "—"}</strong></div>
             <div><span>Isomeric SMILES</span><code title={compound.isomericSmiles}>{compound.isomericSmiles ? `${compound.isomericSmiles.slice(0, 28)}…` : "—"}</code></div>
           </div>
+          {compound.entityNote && <aside className="entity-note"><strong>实体范围提示</strong><span>{compound.entityNote}</span></aside>}
         </div>
       </section>
 
@@ -117,7 +137,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
           </>
         )}
 
-        {tab === "effects" && <RecordSection title="功效研究进展" note="从 PubMed 文献中筛选功效、研究模型、物种与研究终点"><ClaimsList records={effectClaims} empty="当前尚未生成结构化功效条目。平台将从 PubMed 收录文献的题录与摘要中，筛选与当前人参皂苷单体直接相关的功效、研究模型、物种和研究终点，完成后将在此展示。" /></RecordSection>}
+        {tab === "effects" && <RecordSection title="功效研究进展" note="从 PubMed 文献中筛选功效、研究模型、物种与研究终点"><ClaimsList records={effectClaims} empty="当前尚未生成结构化功效条目。平台将从 PubMed 收录文献的题录与摘要中，筛选与当前化合物直接相关的功效、研究模型、物种和研究终点，完成后将在此展示。" /></RecordSection>}
 
         {tab === "targets" && (
           <>
@@ -160,7 +180,7 @@ function PatentList({ records }: { records: Patent[] }) {
 }
 
 function TrialList({ records }: { records: Trial[] }) {
-  if (!records.length) return <Empty>当前暂无明确以该单体为干预的 ClinicalTrials.gov 记录。</Empty>;
+  if (!records.length) return <Empty>当前暂无明确以该化合物为干预的 ClinicalTrials.gov 记录。</Empty>;
   return <div className="record-list">{records.map((item) => <article className="record-card" key={item.id}>
     <div className="record-meta"><span className="badge green">{item.status || "状态未知"}</span>{item.phase && <span className="badge">{item.phase}</span>}{item.resultsAvailable && <span className="badge gold">结果可用</span>}</div>
     <h3>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title} ↗</a> : item.title}</h3>

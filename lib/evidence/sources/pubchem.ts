@@ -20,8 +20,13 @@ import {
 const PUBCHEM_PUG = "https://pubchem.ncbi.nlm.nih.gov/rest/pug";
 const PROPERTY_LIST = [
   "Title",
+  "IUPACName",
   "MolecularFormula",
   "MolecularWeight",
+  "Charge",
+  "CovalentUnitCount",
+  "DefinedAtomStereoCount",
+  "UndefinedAtomStereoCount",
   "CanonicalSMILES",
   "IsomericSMILES",
   "InChI",
@@ -40,8 +45,13 @@ interface PubChemCidResponse {
 interface PubChemProperty {
   CID?: number;
   Title?: string;
+  IUPACName?: string;
   MolecularFormula?: string;
   MolecularWeight?: number | string;
+  Charge?: number | string;
+  CovalentUnitCount?: number | string;
+  DefinedAtomStereoCount?: number | string;
+  UndefinedAtomStereoCount?: number | string;
   CanonicalSMILES?: string;
   IsomericSMILES?: string;
   ConnectivitySMILES?: string;
@@ -64,6 +74,52 @@ interface PubChemInformationResponse {
   };
 }
 
+export type PubChemEntityIdentity = Pick<
+  CompoundCandidate,
+  | "covalentUnitCount"
+  | "canonicalSmiles"
+  | "isomericSmiles"
+>;
+
+function parseInteger(value: unknown): number | undefined {
+  const parsed = parseFiniteNumber(value);
+  return parsed !== undefined && Number.isInteger(parsed) ? parsed : undefined;
+}
+
+/**
+ * Returns true when PubChem represents the selected CID as more than one
+ * disconnected covalent component. The SMILES fallback keeps the check useful
+ * for curated or cached records that predate CovalentUnitCount enrichment.
+ */
+export function isMultiComponentCompound(
+  compound: PubChemEntityIdentity,
+): boolean {
+  if (
+    compound.covalentUnitCount !== undefined &&
+    compound.covalentUnitCount > 1
+  ) {
+    return true;
+  }
+  return [compound.isomericSmiles, compound.canonicalSmiles].some(
+    (smiles) => smiles?.includes(".") === true,
+  );
+}
+
+/**
+ * Builds a display-ready entity note without guessing a specific chemical
+ * class. A disconnected PubChem entity may be a salt, solvate, co-crystal or
+ * another multi-component form, so the wording deliberately preserves that
+ * distinction for downstream evidence retrieval.
+ */
+export function buildPubChemEntityNote(
+  compound: PubChemEntityIdentity,
+): string | undefined {
+  if (!isMultiComponentCompound(compound)) return undefined;
+  const count = compound.covalentUnitCount;
+  const countText = count !== undefined && count > 1 ? `${count} 个` : "多个";
+  return `该 PubChem 化学实体包含${countText}共价单元，可能属于盐、溶剂化物、共晶或其他多组分形式；检索与解读时应保留完整化学实体。`;
+}
+
 function detectQueryKind(query: string): CompoundQueryKind {
   if (/^\d+$/.test(query)) return "cid";
   if (/^[A-Z]{14}-[A-Z]{10}-[A-Z]$/i.test(query)) return "inchikey";
@@ -76,8 +132,13 @@ function propertyToCandidate(property: PubChemProperty): CompoundCandidate | und
   return {
     cid,
     title: property.Title?.trim() || `PubChem CID ${cid}`,
+    iupacName: property.IUPACName?.trim() || undefined,
     molecularFormula: property.MolecularFormula,
     molecularWeight: parseFiniteNumber(property.MolecularWeight),
+    charge: parseInteger(property.Charge),
+    covalentUnitCount: parseInteger(property.CovalentUnitCount),
+    definedAtomStereoCount: parseInteger(property.DefinedAtomStereoCount),
+    undefinedAtomStereoCount: parseInteger(property.UndefinedAtomStereoCount),
     canonicalSmiles: property.ConnectivitySMILES ?? property.CanonicalSMILES,
     isomericSmiles: property.SMILES ?? property.IsomericSMILES,
     inchi: property.InChI,

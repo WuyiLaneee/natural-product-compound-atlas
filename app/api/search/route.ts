@@ -1,5 +1,10 @@
 import { isDatabaseUnavailableError } from "@/db";
-import { findCatalogMatches } from "@/lib/catalog";
+import {
+  COMPOUND_SEARCH_RATE_BUCKET,
+  requiresStructureConfirmation,
+  toSearchCandidate,
+} from "@/lib/evidence/compound-api";
+import { resolvePubChemCompound } from "@/lib/evidence/sources/pubchem";
 import { consumeRateLimit } from "@/lib/storage";
 
 function clientIp(request: Request): string {
@@ -7,26 +12,12 @@ function clientIp(request: Request): string {
   return headers.get("cf-connecting-ip") ?? headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "127.0.0.1";
 }
 
-function toCandidate(entry: ReturnType<typeof findCatalogMatches>[number]) {
-  const cid = entry.pubchemCid;
-  if (!cid) return null;
-  return {
-    cid,
-    title: entry.displayNameEn,
-    displayNameZh: entry.displayNameZh,
-    inchiKey: entry.pubchemInchiKey ?? undefined,
-    structureUrl: `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/PNG?record_type=2d`,
-    verification: entry.pubchemVerification,
-    note: entry.pubchemNote,
-  };
-}
-
 async function enforceRateLimit(request: Request) {
   try {
     const decision = await consumeRateLimit({
-      bucketKey: "compound-search",
+      bucketKey: COMPOUND_SEARCH_RATE_BUCKET,
       ipAddress: clientIp(request),
-      salt: process.env.RATE_LIMIT_SALT || "local-ginsenoside-development",
+      salt: process.env.RATE_LIMIT_SALT || "local-natural-compound-development",
       limit: 30,
       windowMs: 10 * 60 * 1000,
     });
@@ -43,7 +34,12 @@ export async function POST(request: Request) {
   catch { return Response.json({ error: "请求必须是有效 JSON" }, { status: 400 }); }
 
   const query = typeof payload.query === "string" ? payload.query.trim() : "";
-  if (!query || query.length > 160) return Response.json({ error: "请输入 1–160 个字符的人参皂苷名称、CAS、CID 或 InChIKey" }, { status: 400 });
+  if (!query || query.length > 160) {
+    return Response.json(
+      { error: "请输入 1–160 个字符的化合物名称、CAS、PubChem CID 或完整 InChIKey" },
+      { status: 400 },
+    );
+  }
 
   const rate = await enforceRateLimit(request);
   if (rate && !rate.allowed) {
@@ -53,17 +49,43 @@ export async function POST(request: Request) {
     );
   }
 
-  const matches = findCatalogMatches(query, 12);
-  const candidates = matches.map(toCandidate).filter((item): item is NonNullable<typeof item> => Boolean(item));
-  if (!candidates.length) {
+  const resolution = await resolvePubChemCompound(query, {
+    timeoutMs: 12_000,
+    maxRecords: 12,
+  });
+  const candidates = resolution.candidates.map(toSearchCandidate);
+
+  if (resolution.source.status === "error") {
     return Response.json({
-      status: "unsupported",
-      error: "首版仅检索已核验的人参皂苷单体。未找到目录匹配，请尝试完整名称、CAS 或 PubChem CID。",
-      catalogOnly: true,
+      status: "unavailable",
+      error: "PubChem 化合物解析服务暂时不可用，请稍后重试。",
+    }, { status: 502 });
+  }
+
+  if (resolution.status === "not_found" || !candidates.length) {
+    return Response.json({
+      status: "not_found",
+      error: "PubChem 中未找到匹配化合物，请核对名称、CAS、CID 或完整 InChIKey。",
     }, { status: 404 });
   }
 
-  const requiresConfirmation = matches.length > 1 || matches.some((entry) => entry.requiresStereoisomerDisambiguation || entry.pubchemVerification !== "verified-full-stereochemistry");
-  if (requiresConfirmation) return Response.json({ status: "ambiguous", candidates });
-  return Response.json({ status: "resolved", compound: candidates[0] });
+  // A name or CAS number may denote a salt, parent, stereoisomer or mixture
+  // even when PubChem currently returns only one CID. Require an explicit
+  // structure confirmation for these semantic lookups. A unique CID or full
+  // InChIKey is already an exact identity and can continue automatically.
+  if (resolution.status === "ambiguous" || requiresStructureConfirmation(resolution.queryKind)) {
+    return Response.json({
+      status: "ambiguous",
+      queryKind: resolution.queryKind,
+      candidates,
+      totalAvailable: resolution.source.totalAvailable ?? candidates.length,
+      truncated: resolution.source.truncated,
+    });
+  }
+
+  return Response.json({
+    status: "resolved",
+    queryKind: resolution.queryKind,
+    compound: toSearchCandidate(resolution.selected ?? resolution.candidates[0]),
+  });
 }

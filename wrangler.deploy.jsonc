@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "ginsenoside-evidence-atlas",
+  "name": "natural-product-small-molecule-atlas",
   "main": "./dist/server/index.js",
   "workers_dev": true,
   "preview_urls": false,
@@ -24,8 +24,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "ginsenoside-evidence-atlas-db",
-      "database_id": "5d193baf-a03a-45fb-95bb-9c4130ce81e4",
+      "database_name": "natural-product-small-molecule-atlas-db",
+      "database_id": "REPLACE_WITH_NEW_D1_DATABASE_ID",
       "migrations_dir": "./drizzle"
     }
   ],

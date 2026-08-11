@@ -18,16 +18,16 @@ async function render(pathname = "/") {
   );
 }
 
-test("server-renders the corporate research homepage", async () => {
+test("server-renders the natural-product and small-molecule homepage", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /<html lang="zh-CN">/i);
-  assert.match(html, /巨子生物 · 人参皂苷科研信息平台/);
-  assert.match(html, /从人参皂苷单体出发/);
-  assert.match(html, /探索科研与创新价值/);
+  assert.match(html, /天然产物及小分子化合物检索平台/);
+  assert.match(html, /探索天然产物与小分子/);
+  assert.match(html, /连接科研与创新价值/);
   assert.match(html, /PubChem/);
   assert.match(html, /ChEMBL/);
   assert.match(html, /Europe PMC/);
@@ -46,7 +46,7 @@ test("renders the methodology and ships required brand assets", async () => {
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     access(new URL("../public/brand/giant-biogene.png", import.meta.url)),
     access(new URL("../public/brand/nwu.png", import.meta.url)),
-    access(new URL("../public/og-corporate.png", import.meta.url)),
+    access(new URL("../public/og-natural-product.png", import.meta.url)),
   ]);
   assert.equal(response.status, 200);
   const html = await response.text();

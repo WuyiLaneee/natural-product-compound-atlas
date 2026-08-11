@@ -1,21 +1,30 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-import {
-  findCatalogMatches,
-  GINSENOSIDE_CATALOG,
-  GINSENOSIDE_CATEGORIES,
-  type GinsenosideCatalogEntry,
-  type GinsenosideCategory,
-} from "../../lib/catalog";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import {
   aggregateBrowserCompoundEvidence,
+  resolveBrowserCompound,
   type BrowserCompoundPayload,
+  type BrowserCompoundCandidate,
 } from "./data/browserAggregator";
 
 type Route = { page: "home" } | { page: "compound"; cid: number; query: string };
 type Tab = "overview" | "effects" | "targets" | "literature" | "trials" | "patents";
 
-const categoryOrder: GinsenosideCategory[] = ["protopanaxadiol", "protopanaxatriol", "ocotillol", "oleanane"];
-const examples = ["人参皂苷 Rg1", "人参皂苷 F2", "20(S)-Rg3", "Compound K"];
+interface CuratedExample extends BrowserCompoundCandidate {
+  labelZh: string;
+  group: "天然产物" | "药用小分子" | "功能分子";
+}
+
+const examples: readonly CuratedExample[] = [
+  { cid: 5280343, title: "Quercetin", labelZh: "槲皮素", molecularFormula: "C15H10O7", group: "天然产物" },
+  { cid: 445154, title: "Resveratrol", labelZh: "白藜芦醇", molecularFormula: "C14H12O3", group: "天然产物" },
+  { cid: 969516, title: "Curcumin", labelZh: "姜黄素", molecularFormula: "C21H20O6", group: "天然产物" },
+  { cid: 441923, title: "Ginsenoside Rg1", labelZh: "人参皂苷 Rg1", molecularFormula: "C42H72O14", group: "天然产物" },
+  { cid: 2244, title: "Aspirin", labelZh: "阿司匹林", molecularFormula: "C9H8O4", group: "药用小分子" },
+  { cid: 3672, title: "Ibuprofen", labelZh: "布洛芬", molecularFormula: "C13H18O2", group: "药用小分子" },
+  { cid: 2519, title: "Caffeine", labelZh: "咖啡因", molecularFormula: "C8H10N4O2", group: "功能分子" },
+  { cid: 936, title: "Niacinamide", labelZh: "烟酰胺", molecularFormula: "C6H6N2O", group: "功能分子" },
+  { cid: 54670067, title: "L-Ascorbic acid", labelZh: "L-抗坏血酸", molecularFormula: "C6H8O6", group: "功能分子" },
+];
 const tabs: Array<[Tab, string]> = [
   ["overview", "数据总览"], ["effects", "功效研究"], ["targets", "靶点研究"],
   ["literature", "学术论文"], ["trials", "临床研究"], ["patents", "专利信息"],
@@ -29,9 +38,8 @@ function parseRoute(): Route {
   return { page: "home" };
 }
 
-function navigateToCompound(entry: GinsenosideCatalogEntry, query = entry.displayNameZh) {
-  if (!entry.pubchemCid) return;
-  window.location.hash = `/compound/${entry.pubchemCid}?q=${encodeURIComponent(query)}`;
+function navigateToCompound(cid: number, query: string) {
+  window.location.hash = `/compound/${cid}?q=${encodeURIComponent(query)}`;
 }
 
 function asset(path: string) {
@@ -56,7 +64,7 @@ function Header({ compact = false }: { compact?: boolean }) {
       <span className="brand-cross">×</span>
       <img className="nwu-logo" src={asset("brand/nwu.png")} alt="西北大学" />
       <span className="brand-divider" />
-      <span className="product-name">人参皂苷<br />科研平台</span>
+      <span className="product-name">天然产物及小分子<br />化合物检索平台</span>
     </a>
     <div className="header-edition" title="当前为 GitHub Pages 公开数据入口">
       <span className="edition-dot" />
@@ -66,46 +74,40 @@ function Header({ compact = false }: { compact?: boolean }) {
 }
 
 function HomePage() {
-  const [filter, setFilter] = useState<GinsenosideCategory | "all">("all");
-  const visible = filter === "all" ? GINSENOSIDE_CATALOG : GINSENOSIDE_CATALOG.filter((item) => item.category === filter);
   return <main>
     <Header />
     <section className="hero-shell">
       <div className="hero-grid" aria-hidden="true" />
       <div className="hero-copy">
-        <p className="eyebrow"><span /> GIANT BIOGENE · GINSENOSIDE RESEARCH</p>
-        <h1>从人参皂苷单体出发，<br />探索科研与创新价值</h1>
-        <p className="hero-lead">检索化合物身份、功效研究、作用靶点、论文与临床试验，快速连接全球公开科研信息。</p>
+        <p className="eyebrow"><span /> GIANT BIOGENE · MOLECULAR DISCOVERY</p>
+        <h1>从一个化合物出发，<br />连接全球公开科研信息</h1>
+        <p className="hero-lead">面向天然产物及小分子化合物，检索化学身份、功效研究、实验靶点、学术论文与临床研究。</p>
         <SearchModule />
         <div className="public-scope"><i />当前入口直接连接公开数据库；EPO 深度专利与智能解析将在腾讯云正式入口开放。</div>
       </div>
       <div className="molecule-orbit" aria-hidden="true">
         <div className="orbit orbit-a"><i /><i /><i /></div><div className="orbit orbit-b"><i /><i /></div>
-        <div className="orbit-core"><strong>C<sub>42</sub>H<sub>72</sub>O<sub>14</sub></strong><span>GINSENOSIDE</span></div>
+        <div className="orbit-core"><strong>C<sub>x</sub>H<sub>y</sub>O<sub>z</sub></strong><span>COMPOUND SPACE</span></div>
       </div>
     </section>
 
     <section className="source-strip" aria-label="公开数据源">
-      <div><strong>PubChem</strong><span>化合物身份</span><em>实时</em></div>
+      <div><strong>PubChem</strong><span>身份解析与结构</span><em>实时</em></div>
       <div><strong>ChEMBL</strong><span>活性与靶点</span><em>实时</em></div>
       <div><strong>PubMed / Europe PMC</strong><span>论文与功效</span><em>实时</em></div>
       <div><strong>ClinicalTrials.gov</strong><span>临床研究</span><em>实时</em></div>
     </section>
 
-    <section className="catalog-section" id="catalog">
+    <section className="catalog-section" id="examples">
       <header className="section-heading">
-        <div><p className="eyebrow dark"><span /> CURATED COMPOUND DIRECTORY</p><h2>人参皂苷单体目录</h2></div>
-        <p>收录 30 个常用单体及明确的 20(S)/20(R) 异构体，可按类型浏览或直接检索。</p>
+        <div><p className="eyebrow dark"><span /> START WITH A MOLECULE</p><h2>常见化合物示例</h2></div>
+        <p>以下为已确认 PubChem CID 的快速入口。平台不限于这些示例，也可在上方输入其他天然产物或小分子。</p>
       </header>
-      <div className="catalog-filters" role="group" aria-label="按结构类型筛选">
-        <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>全部 <span>30</span></button>
-        {categoryOrder.map((key) => <button key={key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{GINSENOSIDE_CATEGORIES[key].labelZh} <span>{GINSENOSIDE_CATALOG.filter((x) => x.category === key).length}</span></button>)}
-      </div>
       <div className="catalog-grid">
-        {visible.map((entry) => <button className="compound-card" key={entry.slug} onClick={() => navigateToCompound(entry)} disabled={!entry.pubchemCid}>
-          <span className="compound-index">{String(GINSENOSIDE_CATALOG.indexOf(entry) + 1).padStart(2, "0")}</span>
-          <span className="compound-names"><strong>{entry.displayNameZh}</strong><small>{entry.displayNameEn}</small></span>
-          <span className="compound-cid">CID {entry.pubchemCid || "待确认"}</span><span className="card-arrow">→</span>
+        {examples.map((entry, index) => <button className="compound-card" key={entry.cid} onClick={() => navigateToCompound(entry.cid, entry.title)}>
+          <span className="compound-index">{String(index + 1).padStart(2, "0")}</span>
+          <span className="compound-names"><strong>{entry.labelZh}</strong><small>{entry.title} · {entry.group}</small></span>
+          <span className="compound-cid">CID {entry.cid} · {entry.molecularFormula}</span><span className="card-arrow">→</span>
         </button>)}
       </div>
     </section>
@@ -116,29 +118,46 @@ function HomePage() {
 function SearchModule({ compact = false, initialValue = "" }: { compact?: boolean; initialValue?: string }) {
   const [query, setQuery] = useState(initialValue);
   const [message, setMessage] = useState("");
-  const [candidates, setCandidates] = useState<readonly GinsenosideCatalogEntry[]>([]);
-  const suggestions = useMemo(() => query.trim() ? findCatalogMatches(query, 6) : [], [query]);
+  const [candidates, setCandidates] = useState<BrowserCompoundCandidate[]>([]);
+  const [resolving, setResolving] = useState(false);
+  const requestRef = useRef<AbortController | null>(null);
 
-  function submit(value = query) {
+  async function submit(value = query) {
     const clean = value.trim();
     if (!clean) { setMessage("请输入名称、CAS、PubChem CID 或 InChIKey"); return; }
-    const matches = findCatalogMatches(clean, 12);
-    if (matches.length === 1) { navigateToCompound(matches[0], clean); return; }
-    if (matches.length > 1) { setCandidates(matches); setMessage("发现多个可能的化学实体，请选择具体单体或立体异构体。"); return; }
-    setCandidates([]); setMessage("当前公开版支持下方 30 个人参皂苷单体，请从目录中选择。");
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setCandidates([]); setMessage(""); setResolving(true);
+    try {
+      const resolution = await resolveBrowserCompound(clean, { signal: controller.signal });
+      if (resolution.candidates.length === 1 && (resolution.queryKind === "cid" || resolution.queryKind === "inchikey")) {
+        navigateToCompound(resolution.candidates[0].cid, clean);
+        return;
+      }
+      setCandidates(resolution.candidates);
+      setMessage(resolution.message || (resolution.candidates.length === 1
+        ? "PubChem 将输入解释为以下实体，请核对结构、分子式和 InChIKey 后确认。"
+        : "请从 PubChem 候选结构中选择。"));
+    } catch (reason) {
+      if (!(reason instanceof DOMException && reason.name === "AbortError")) {
+        setMessage("化合物解析暂未完成，请稍后重试。");
+      }
+    } finally {
+      if (requestRef.current === controller) setResolving(false);
+    }
   }
 
   return <div className={`search-module${compact ? " compact" : ""}`}>
     <form className="search-box" role="search" onSubmit={(event: FormEvent) => { event.preventDefault(); submit(); }}>
-      <label className="sr-only" htmlFor={compact ? "search-compact" : "search-main"}>检索人参皂苷单体</label>
+      <label className="sr-only" htmlFor={compact ? "search-compact" : "search-main"}>检索天然产物及小分子化合物</label>
       <span className="search-icon" aria-hidden="true" />
-      <input id={compact ? "search-compact" : "search-main"} value={query} onChange={(e) => { setQuery(e.target.value); setCandidates([]); setMessage(""); }} placeholder="输入名称、CAS 或 PubChem CID，如：人参皂苷 F2" autoComplete="off" />
-      <button type="submit">开始检索 <span>→</span></button>
+      <input id={compact ? "search-compact" : "search-main"} value={query} onChange={(e) => { setQuery(e.target.value); setCandidates([]); setMessage(""); }} placeholder="输入名称、CAS、CID 或 InChIKey，如：Quercetin" autoComplete="off" />
+      <button type="submit" disabled={resolving}>{resolving ? "解析中" : "开始检索"} <span>→</span></button>
     </form>
-    {query && suggestions.length > 0 && candidates.length === 0 && <div className="search-suggestions" role="listbox">{suggestions.map((item) => <button key={item.slug} onClick={() => navigateToCompound(item, query)}><strong>{item.displayNameZh}</strong><span>{item.displayNameEn} · CID {item.pubchemCid}</span></button>)}</div>}
-    {!compact && <div className="example-chips"><span>试试：</span>{examples.map((item) => <button key={item} onClick={() => { setQuery(item); submit(item); }}>{item}</button>)}</div>}
+    {!compact && <div className="example-chips"><span>快速查看：</span>{examples.slice(0, 4).map((item) => <button key={item.cid} onClick={() => navigateToCompound(item.cid, item.title)}>{item.labelZh}</button>)}</div>}
     {message && <p className="search-message" role="status">{message}</p>}
-    {candidates.length > 0 && <div className="candidate-grid">{candidates.map((item) => <button key={item.slug} onClick={() => navigateToCompound(item, query)}><strong>{item.displayNameZh}</strong><span>{item.displayNameEn} · CID {item.pubchemCid}</span><code>{item.pubchemInchiKey}</code></button>)}</div>}
+    {candidates.length > 0 && <div className="candidate-grid" aria-label="PubChem 候选化学实体">{candidates.map((item) => <button key={item.cid} onClick={() => navigateToCompound(item.cid, query)}><img src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${item.cid}/PNG?record_type=2d&image_size=small`} alt="" /><span className="candidate-copy"><strong>{item.title}</strong>{item.iupacName && item.iupacName !== item.title && <small>IUPAC · {item.iupacName}</small>}<span>CID {item.cid} · {item.molecularFormula || "分子式未返回"}{item.charge !== undefined ? ` · 净电荷 ${item.charge}` : ""}{item.covalentUnitCount !== undefined ? ` · ${item.covalentUnitCount} 个共价单元` : ""}</span><code>{item.inchiKey || "InChIKey 未返回"}</code>{item.entityNote && <small className="candidate-entity-note">实体范围提示：{item.entityNote}</small>}</span><span className="candidate-action">确认此结构 →</span></button>)}</div>}
   </div>;
 }
 
@@ -171,7 +190,7 @@ function LoadingState() {
 }
 
 function ErrorState({ message, retry }: { message: string; retry: () => void }) {
-  return <section className="result-error" role="alert"><span className="error-mark">!</span><div><p className="eyebrow dark"><span /> CONNECTION STATUS</p><h1>暂时无法完成本次检索</h1><p>{message}</p><p>公开数据库可能暂时不可达，已获取的信息不会受影响，请稍后重试。</p><div className="error-actions"><button onClick={retry}>重新检索</button><a href="#/">返回目录</a></div></div></section>;
+  return <section className="result-error" role="alert"><span className="error-mark">!</span><div><p className="eyebrow dark"><span /> CONNECTION STATUS</p><h1>暂时无法完成本次检索</h1><p>{message}</p><p>公开数据库可能暂时不可达，已获取的信息不会受影响，请稍后重试。</p><div className="error-actions"><button onClick={retry}>重新检索</button><a href="#/">返回检索首页</a></div></div></section>;
 }
 
 function CompoundResult({ payload, tab, setTab }: { payload: BrowserCompoundPayload; tab: Tab; setTab: (tab: Tab) => void }) {
@@ -180,10 +199,10 @@ function CompoundResult({ payload, tab, setTab }: { payload: BrowserCompoundPayl
   const targets = payload.claims.filter((x) => x.kind === "target" || x.kind === "mechanism");
   const uniqueTargets = new Set(payload.bioactivities.map((x) => x.targetName).filter(Boolean)).size;
   return <>
-    <a href="#/" className="back-link">← 返回单体目录</a>
+    <a href="#/" className="back-link">← 返回检索首页</a>
     <section className="identity-panel">
       <div className="structure-box"><img src={compound.structureUrl || `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${compound.cid}/PNG?record_type=2d`} alt={`${compound.title} 二维结构`} /></div>
-      <div className="identity-copy"><p className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</p><h1>{compound.title}</h1><p className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || "相关名称整理中"}</p><div className="identity-facts"><div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div><div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div><div><span>InChIKey</span><code>{compound.inchiKey || "—"}</code></div><div><span>Isomeric SMILES</span><code title={compound.isomericSmiles}>{compound.isomericSmiles ? `${compound.isomericSmiles.slice(0, 30)}…` : "—"}</code></div></div></div>
+      <div className="identity-copy"><p className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</p><h1>{compound.title}</h1><p className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || "相关名称整理中"}</p>{compound.iupacName && <p className="iupac-line"><span>IUPAC</span>{compound.iupacName}</p>}<div className="identity-facts"><div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div><div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div><div><span>净电荷</span><strong>{compound.charge ?? "—"}</strong></div><div><span>共价单元</span><strong>{compound.covalentUnitCount ?? "—"}</strong></div><div><span>InChIKey</span><code>{compound.inchiKey || "—"}</code></div><div><span>原子立体中心</span><strong>{compound.definedAtomStereoCount !== undefined || compound.undefinedAtomStereoCount !== undefined ? `${compound.definedAtomStereoCount ?? 0} 已定义 · ${compound.undefinedAtomStereoCount ?? 0} 未定义` : "—"}</strong></div><div><span>Isomeric SMILES</span><code title={compound.isomericSmiles}>{compound.isomericSmiles ? `${compound.isomericSmiles.slice(0, 30)}…` : "—"}</code></div></div>{compound.entityNote && <aside className="entity-note"><strong>实体范围提示</strong><span>{compound.entityNote}</span></aside>}</div>
     </section>
     <div className="coverage-row">{payload.sources.filter((source) => !/EPO|机器抽取|单位模型|智能解析/i.test(source.source)).map((source) => <span className={`status-pill ${source.status}`} key={source.source} title={source.message}><i />{sourceName(source.source)}{typeof source.count === "number" ? ` · ${source.count}` : ""}</span>)}<span className="status-pill locked"><i />EPO / 智能解析 · 腾讯云入口</span></div>
     {payload.coverageNote && <p className="coverage-note">{payload.coverageNote}</p>}
@@ -214,7 +233,7 @@ function ClaimList({ records, empty }: { records: BrowserCompoundPayload["claims
 }
 
 function TrialList({ records }: { records: BrowserCompoundPayload["trials"] }) {
-  if (!records.length) return <Empty>当前暂无明确以该单体为干预的临床试验记录。</Empty>;
+  if (!records.length) return <Empty>当前暂无明确以该化合物为干预的临床试验记录。</Empty>;
   return <div className="record-list">{records.map((item) => <article className="record-card" key={item.id}><div className="record-meta"><span className="badge green">{item.status || "状态未知"}</span>{item.phase && <span className="badge">{item.phase}</span>}</div><h3>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title} ↗</a> : item.title}</h3><p>{item.id}{item.conditions?.length ? ` · ${item.conditions.join(" / ")}` : ""}{item.enrollment ? ` · N=${item.enrollment}` : ""}</p></article>)}</div>;
 }
 
@@ -234,4 +253,4 @@ function sourceName(source: string) {
   return source;
 }
 
-function Footer() { return <footer className="site-footer"><div><img src={asset("brand/giant-biogene.png")} alt="巨子生物" /><span>×</span><img src={asset("brand/nwu.png")} alt="西北大学" /></div><p>巨子生物 × 西北大学 · 人参皂苷科研信息平台</p><small>PUBLIC DATA EDITION · 公开数据入口</small></footer>; }
+function Footer() { return <footer className="site-footer"><div><img src={asset("brand/giant-biogene.png")} alt="巨子生物" /><span>×</span><img src={asset("brand/nwu.png")} alt="西北大学" /></div><p>巨子生物 × 西北大学 · 天然产物及小分子化合物检索平台</p><small>PUBLIC DATA EDITION · 公开数据入口</small></footer>; }

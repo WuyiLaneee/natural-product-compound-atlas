@@ -3,7 +3,7 @@ import { SiteHeader } from "../components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "平台介绍与数据能力",
-  description: "了解巨子生物人参皂苷科研信息平台的化合物识别、多源数据整合、靶点分析、专利洞察与持续更新能力。",
+  description: "了解天然产物及小分子化合物检索平台的化学实体识别、多源数据整合、靶点分析、专利洞察与持续更新能力。",
 };
 
 export default function MethodologyPage() {
@@ -12,8 +12,8 @@ export default function MethodologyPage() {
       <SiteHeader compact />
       <section className="page-hero">
         <div className="eyebrow"><span /> PLATFORM &amp; DATA CAPABILITIES</div>
-        <h1>连接多源科研数据，洞察人参皂苷研究价值</h1>
-        <p>巨子生物人参皂苷科研信息平台围绕化合物、功效、靶点、论文、临床研究与专利信息，打造一站式科研数据检索与分析体验。</p>
+        <h1>连接多源科研数据，洞察天然产物与小分子价值</h1>
+        <p>天然产物及小分子化合物检索平台围绕化学身份、功效、靶点、论文、临床研究与专利信息，打造一站式科研数据检索与分析体验。</p>
       </section>
       <div className="method-body">
         <div className="method-grid">
@@ -27,8 +27,8 @@ export default function MethodologyPage() {
           </nav>
           <div className="method-content">
             <section id="identity">
-              <h2>1. 精准识别每一种皂苷单体</h2>
-              <p>输入名称、CAS 或 PubChem CID，即可关联分子式、分子量、完整 InChIKey、同义词与二维结构。对于存在立体异构体的化合物，平台同步展示结构标识，帮助科研人员准确定位目标单体。</p>
+              <h2>1. 精准识别目标化学实体</h2>
+              <p>通过常见中文快捷入口、PubChem 可识别的英文名称、CAS、PubChem CID 或 InChIKey，即可关联分子式、分子量、标准结构、同义词与二维结构。对于存在盐型、互变异构或立体异构体的化合物，平台同步展示结构标识，帮助科研人员准确定位目标实体。</p>
               <p className="callout">平台采用完整 27 位 InChIKey 建立精确结构关联，并以 connectivity block 辅助呈现相关异构体，让化合物身份与靶点活性数据保持一致。</p>
             </section>
 

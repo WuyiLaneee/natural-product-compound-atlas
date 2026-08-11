@@ -6,12 +6,24 @@ import { useRouter } from "next/navigation";
 type Candidate = {
   cid: number;
   title: string;
+  iupacName?: string;
   molecularFormula?: string;
+  molecularWeight?: number;
+  charge?: number;
+  covalentUnitCount?: number;
+  definedAtomStereoCount?: number;
+  undefinedAtomStereoCount?: number;
   inchiKey?: string;
+  entityNote?: string;
   structureUrl?: string;
 };
 
-const examples = ["人参皂苷 Rg1", "人参皂苷 F2", "20(S)-Rg3", "Compound K"];
+const examples = [
+  { label: "姜黄素", query: "Curcumin" },
+  { label: "白藜芦醇", query: "Resveratrol" },
+  { label: "槲皮素", query: "Quercetin" },
+  { label: "咖啡因", query: "Caffeine" },
+] as const;
 
 export function SearchForm({ compact = false, initialValue = "" }: { compact?: boolean; initialValue?: string }) {
   const router = useRouter();
@@ -22,18 +34,25 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
   const suggestions = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return [];
-    return examples.filter((item) => item.toLowerCase().includes(needle) && item !== query).slice(0, 4);
+    return examples.filter((item) =>
+      `${item.label} ${item.query}`.toLowerCase().includes(needle)
+      && item.label !== query
+      && item.query.toLowerCase() !== needle,
+    ).slice(0, 4);
   }, [query]);
 
   async function submit(value = query) {
     const clean = value.trim();
-    if (!clean) { setMessage("请输入人参皂苷名称、CAS 或 PubChem CID"); return; }
+    if (!clean) { setMessage("请输入化合物名称、CAS、PubChem CID 或 InChIKey"); return; }
+    const apiQuery = examples.find((item) =>
+      item.label === clean || item.query.toLowerCase() === clean.toLowerCase(),
+    )?.query ?? clean;
     setLoading(true); setMessage(""); setCandidates([]);
     try {
       const response = await fetch("/api/search", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query: clean }),
+        body: JSON.stringify({ query: apiQuery }),
       });
       const data = await response.json() as {
         status?: string;
@@ -41,16 +60,21 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
         compound?: Candidate;
         candidates?: Candidate[];
       };
-      if (!response.ok) throw new Error(data.error || "检索服务暂时不可用");
+      if (!response.ok) {
+        const responseMessage = data.error || "未找到匹配化合物，请检查英文名称、CAS、CID 或 InChIKey";
+        throw new Error(responseMessage);
+      }
       if (data.status === "resolved" && data.compound) {
         router.push(`/compound/${data.compound.cid}?q=${encodeURIComponent(clean)}`);
         return;
       }
       if (data.status === "ambiguous" && data.candidates?.length) {
         setCandidates(data.candidates);
-        setMessage("发现多个可能的化学实体，请根据结构和 InChIKey 选择。 ");
+        setMessage(data.candidates.length === 1
+          ? "PubChem 将输入解释为以下实体，请核对结构、分子式和 InChIKey 后确认。"
+          : `PubChem 返回 ${data.candidates.length} 个可能的化学实体，请根据结构、分子式和 InChIKey 选择。`);
       } else {
-        setMessage(data.error || "未在人参皂苷目录与 PubChem 中找到匹配项");
+        setMessage(data.error || "未在公开化合物数据中找到匹配项");
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "检索失败，请稍后重试");
@@ -64,30 +88,40 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
   return (
     <div className={`search-module${compact ? " compact" : ""}`}>
       <form className="search-box" onSubmit={onSubmit} role="search">
-        <label className="sr-only" htmlFor={compact ? "compound-search-compact" : "compound-search"}>检索人参皂苷单体</label>
+        <label className="sr-only" htmlFor={compact ? "compound-search-compact" : "compound-search"}>检索天然产物或小分子化合物</label>
         <span className="search-icon" aria-hidden="true" />
         <input
           id={compact ? "compound-search-compact" : "compound-search"}
           value={query}
           onChange={(event) => { setQuery(event.target.value); setCandidates([]); setMessage(""); }}
-          placeholder="输入名称、CAS 或 PubChem CID，如：人参皂苷 F2"
+          placeholder="输入英文名称、CAS、PubChem CID 或 InChIKey，如：Curcumin"
           autoComplete="off"
         />
         <button type="submit" disabled={loading}>{loading ? "正在解析…" : "开始检索"}<span>→</span></button>
       </form>
       {suggestions.length > 0 && (
         <div className="search-suggestions" role="listbox" aria-label="检索建议">
-          {suggestions.map((item) => <button key={item} onClick={() => { setQuery(item); void submit(item); }}>{item}</button>)}
+          {suggestions.map((item) => <button key={item.query} onClick={() => { setQuery(item.label); void submit(item.query); }}>{item.label} · {item.query}</button>)}
         </div>
       )}
-      {!compact && <div className="example-chips"><span>试试：</span>{examples.map((item) => <button key={item} onClick={() => { setQuery(item); void submit(item); }}>{item}</button>)}</div>}
+      {!compact && <div className="example-chips"><span>中文快捷入口：</span>{examples.map((item) => <button key={item.query} onClick={() => { setQuery(item.label); void submit(item.query); }}>{item.label}</button>)}</div>}
       {message && <p className="search-message" role="status">{message}</p>}
       {candidates.length > 0 && (
         <div className="candidate-grid">
           {candidates.map((candidate) => (
             <button key={candidate.cid} className="candidate-card" onClick={() => router.push(`/compound/${candidate.cid}?q=${encodeURIComponent(query)}`)}>
               {candidate.structureUrl && <img src={candidate.structureUrl} alt={`${candidate.title} 二维结构`} />}
-              <span><strong>{candidate.title}</strong><small>CID {candidate.cid} · {candidate.molecularFormula || "分子式待获取"}</small><code>{candidate.inchiKey || "InChIKey 待获取"}</code></span>
+              <span>
+                <strong>{candidate.title}</strong>
+                {candidate.iupacName && candidate.iupacName !== candidate.title && <small className="candidate-iupac">IUPAC · {candidate.iupacName}</small>}
+                <small>
+                  CID {candidate.cid} · {candidate.molecularFormula || "分子式待获取"}
+                  {candidate.charge !== undefined ? ` · 净电荷 ${candidate.charge}` : ""}
+                  {candidate.covalentUnitCount !== undefined ? ` · ${candidate.covalentUnitCount} 个共价单元` : ""}
+                </small>
+                <code>{candidate.inchiKey || "InChIKey 待获取"}</code>
+                {candidate.entityNote && <small className="candidate-entity-note">实体范围提示：{candidate.entityNote}</small>}
+              </span>
             </button>
           ))}
         </div>

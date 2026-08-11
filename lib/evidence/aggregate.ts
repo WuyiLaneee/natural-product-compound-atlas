@@ -17,6 +17,10 @@ import type {
   SourceResult,
 } from "./types";
 import { fetchChEMBLActivities } from "./sources/chembl";
+import {
+  selectPublicationEffectAliases,
+  selectScientificAliases,
+} from "./compound-aliases";
 import { extractPublicationEffectClaims } from "./publication-effects";
 import { searchClinicalTrials } from "./sources/clinical-trials";
 import {
@@ -242,59 +246,6 @@ function profilePatentRecords(profile: CompoundProfile): PatentRecord[] {
   }));
 }
 
-function scientificAliases(input: AggregateCompoundEvidenceInput, profile: CompoundProfile): string[] {
-  return uniqueStrings([
-    profile.title,
-    input.compound?.title,
-    ...(input.compound ? [] : [input.query]),
-    ...(input.aliases ?? []),
-    ...profile.synonyms,
-  ])
-    .filter((term) => {
-      if (term.length < 2 || term.length > 100) return false;
-      if (/^\d+(?:-\d+)+$/.test(term)) return false;
-      if (/^[A-Z]{14}-[A-Z]{10}-[A-Z]$/i.test(term)) return false;
-      if (!/\p{L}/u.test(term)) return false;
-
-      // Short aliases such as "F2", "Re" or "CK" create large numbers of
-      // unrelated literature and trial hits. Scientific retrieval therefore
-      // uses compound-specific names only; short aliases remain available for
-      // catalog lookup and UI display, but never become upstream evidence
-      // queries by themselves.
-      return (
-        /ginsenoside|notoginsenoside|pseudoginsenoside|compound\s*k|人参皂苷|三七皂苷|拟人参皂苷/i.test(term) ||
-        /^20\s*(?:\(\s*[SR]\s*\)|[SR])[-\s]?[A-Z]+\d*/i.test(term)
-      );
-    })
-    .slice(0, 6);
-}
-
-function publicationEffectAliases(
-  input: AggregateCompoundEvidenceInput,
-  profile: CompoundProfile,
-  aliases: string[],
-): string[] {
-  // PubChem's preferred title can collapse an explicit 20(S)/20(R) catalog
-  // identity back to the generic parent name. Prefer the caller-confirmed
-  // structure title so generic Rg2/Rg3/Rh records cannot populate a specific
-  // stereoisomer page.
-  const identityTitle = input.compound?.title ?? input.query ?? profile.title;
-  const stereoMatch = identityTitle.match(/20\s*\(\s*([SR])\s*\)/iu);
-  if (!stereoMatch) return aliases;
-
-  const configuration = stereoMatch[1].toLocaleUpperCase();
-  const stereoAliases = aliases.filter((alias) => {
-    const compact = alias.normalize("NFKC").replace(/\s+/gu, "").toLocaleUpperCase();
-    return (
-      compact.includes(`20(${configuration})`) ||
-      compact.includes(`20${configuration}-`) ||
-      compact.startsWith(`${configuration}-GINSENOSIDE`)
-    );
-  });
-
-  return stereoAliases.length > 0 ? stereoAliases : [identityTitle];
-}
-
 function sourceText(parts: Array<string | undefined>): string {
   return normalizeWhitespace(parts.filter(Boolean).join("\n"));
 }
@@ -490,8 +441,11 @@ export async function aggregateCompoundEvidence(
   const profile: CompoundProfile = input.compound
     ? { ...fetchedProfile, title: input.compound.title }
     : fetchedProfile;
-  const aliases = scientificAliases(input, profile);
-  const preciseAliases = publicationEffectAliases(input, profile, aliases);
+  // Downstream retrieval names are derived only from the CID-resolved PubChem
+  // profile. The user's original q value and caller aliases never influence a
+  // CID-scoped evidence payload or its cache.
+  const aliases = selectScientificAliases(profile);
+  const preciseAliases = selectPublicationEffectAliases(profile, aliases);
   const requestOptions = { timeoutMs: input.timeoutMs, fetchImpl: input.fetchImpl };
 
   const [chembl, europePmc, clinicalTrials, epoOps] = await Promise.all([

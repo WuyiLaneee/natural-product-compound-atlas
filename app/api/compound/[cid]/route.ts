@@ -1,6 +1,16 @@
 import { isDatabaseUnavailableError } from "@/db";
-import { getCatalogEntryByPubchemCid } from "@/lib/catalog";
 import { aggregateCompoundEvidence, inferEvidenceLevel } from "@/lib/evidence/aggregate";
+import {
+  COMPOUND_EVIDENCE_CACHE_SOURCE,
+  COMPOUND_EVIDENCE_CACHE_TTL_MS,
+  COMPOUND_REFRESH_RATE_BUCKET,
+  compoundEvidenceCacheId,
+  parsePubChemCid,
+} from "@/lib/evidence/compound-api";
+import {
+  buildPubChemEntityNote,
+  resolvePubChemCompound,
+} from "@/lib/evidence/sources/pubchem";
 import type {
   ChEMBLActivity,
   ClinicalTrialRecord,
@@ -19,10 +29,6 @@ import {
 } from "@/lib/storage";
 
 export const runtime = "edge";
-
-const CACHE_SOURCE = "evidence_aggregate";
-const CACHE_VERSION = "v2-pubmed-effects";
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function clientIp(request: Request): string {
   return request.headers.get("cf-connecting-ip")
@@ -192,11 +198,17 @@ function mapPayload(aggregation: EvidenceAggregation, fallback: CompoundProfile)
     compound: {
       cid: compound.cid,
       title: compound.title,
+      iupacName: compound.iupacName,
       molecularFormula: compound.molecularFormula,
       molecularWeight: compound.molecularWeight,
+      charge: compound.charge,
+      covalentUnitCount: compound.covalentUnitCount,
+      definedAtomStereoCount: compound.definedAtomStereoCount,
+      undefinedAtomStereoCount: compound.undefinedAtomStereoCount,
       inchiKey: compound.inchiKey,
       isomericSmiles: compound.isomericSmiles,
       synonyms: compound.synonyms,
+      entityNote: buildPubChemEntityNote(compound),
       structureUrl: `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${compound.cid}/PNG?record_type=2d`,
     },
     sources: [
@@ -224,7 +236,10 @@ function isCachedPayload(value: unknown, cid: number): value is Record<string, u
 
 async function readCache(cid: number): Promise<Record<string, unknown> | null> {
   try {
-    const cached = await getCachedSourceRecord(CACHE_SOURCE, `${CACHE_VERSION}:${cid}`);
+    const cached = await getCachedSourceRecord(
+      COMPOUND_EVIDENCE_CACHE_SOURCE,
+      compoundEvidenceCacheId(cid),
+    );
     return cached && isCachedPayload(cached.record.payload, cid) ? cached.record.payload : null;
   } catch (error) {
     if (isDatabaseUnavailableError(error) || process.env.NODE_ENV !== "production") return null;
@@ -235,11 +250,11 @@ async function readCache(cid: number): Promise<Record<string, unknown> | null> {
 async function writeCache(cid: number, payload: Record<string, unknown>): Promise<void> {
   try {
     await upsertCachedSourceRecord({
-      source: CACHE_SOURCE,
-      externalId: `${CACHE_VERSION}:${cid}`,
-      recordType: "compound_evidence_aggregate",
+      source: COMPOUND_EVIDENCE_CACHE_SOURCE,
+      externalId: compoundEvidenceCacheId(cid),
+      recordType: "pubchem_compound_evidence_aggregate",
       payload,
-      ttlMs: CACHE_TTL_MS,
+      ttlMs: COMPOUND_EVIDENCE_CACHE_TTL_MS,
     });
   } catch (error) {
     if (isDatabaseUnavailableError(error) || process.env.NODE_ENV !== "production") return;
@@ -250,10 +265,10 @@ async function writeCache(cid: number, payload: Record<string, unknown>): Promis
 async function enforceRefreshLimit(request: Request) {
   try {
     return await consumeRateLimit({
-      bucketKey: "uncached-evidence-refresh",
+      bucketKey: COMPOUND_REFRESH_RATE_BUCKET,
       ipAddress: clientIp(request),
-      salt: process.env.RATE_LIMIT_SALT || "local-ginsenoside-development",
-      limit: 3,
+      salt: process.env.RATE_LIMIT_SALT || "local-natural-compound-development",
+      limit: 12,
       windowMs: 60 * 60 * 1000,
     });
   } catch (error) {
@@ -264,13 +279,8 @@ async function enforceRefreshLimit(request: Request) {
 
 export async function GET(request: Request, context: { params: Promise<{ cid: string }> }) {
   const { cid: rawCid } = await context.params;
-  if (!/^\d+$/.test(rawCid)) return Response.json({ error: "PubChem CID 格式无效" }, { status: 400 });
-
-  const cid = Number(rawCid);
-  const entry = getCatalogEntryByPubchemCid(cid);
-  if (!entry || !entry.pubchemCid || !entry.pubchemInchiKey) {
-    return Response.json({ error: "首版仅支持目录内已核验的人参皂苷单体" }, { status: 404 });
-  }
+  const cid = parsePubChemCid(rawCid);
+  if (cid === null) return Response.json({ error: "PubChem CID 格式无效" }, { status: 400 });
 
   const cached = await readCache(cid);
   if (cached) {
@@ -287,16 +297,27 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
     );
   }
 
-  // The CID and catalog entry are the confirmed chemical identity. The page's
-  // optional q parameter is presentation context only and must never alter the
-  // evidence query or poison the CID-scoped cache with another compound.
-  const query = entry.displayNameEn;
-  const compound = {
-    cid,
-    title: entry.displayNameEn,
-    inchiKey: entry.pubchemInchiKey,
-    pubchemUrl: `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`,
-  };
+  // CID is the sole identity and cache key. The optional page-level `q`
+  // parameter is deliberately never read, so a display query cannot alter
+  // evidence retrieval or poison another compound's cached payload.
+  const resolution = await resolvePubChemCompound(String(cid), {
+    timeoutMs: 12_000,
+    maxRecords: 1,
+  });
+  if (resolution.source.status === "error") {
+    return Response.json(
+      {
+        status: "unavailable",
+        error: "PubChem 化合物身份解析暂时不可用，请稍后重试。",
+      },
+      { status: 502 },
+    );
+  }
+  if (resolution.status !== "resolved" || !resolution.selected) {
+    return Response.json({ error: `PubChem CID ${cid} 不存在或未返回化合物记录。` }, { status: 404 });
+  }
+
+  const compound = resolution.selected;
   const epo = hasText(process.env.EPO_CLIENT_ID) && hasText(process.env.EPO_CLIENT_SECRET)
     ? { clientId: process.env.EPO_CLIENT_ID, clientSecret: process.env.EPO_CLIENT_SECRET }
     : undefined;
@@ -313,9 +334,8 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
 
   try {
     const aggregation = await aggregateCompoundEvidence({
-      query,
+      query: String(cid),
       compound,
-      aliases: [entry.displayNameZh, entry.displayNameEn, ...entry.aliases],
       epo,
       model,
       timeoutMs: 15_000,
@@ -331,7 +351,7 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
     });
     const fallback: CompoundProfile = {
       ...compound,
-      synonyms: [entry.displayNameZh, entry.displayNameEn, ...entry.aliases],
+      synonyms: [compound.title],
       patentReferences: [],
       patentReferenceCount: 0,
     };

@@ -1,4 +1,3 @@
-import { getCatalogEntryByPubchemCid } from "../catalog";
 import { aggregateCompoundEvidence, inferEvidenceLevel } from "./aggregate";
 import {
   readBrowserCache,
@@ -7,6 +6,10 @@ import {
   type BrowserCacheStorage,
 } from "./browser-cache";
 import { createBrowserFetchImpl } from "./browser-fetch";
+import {
+  buildPubChemEntityNote,
+  resolvePubChemCompound,
+} from "./sources/pubchem";
 import type {
   ChEMBLActivity,
   ClinicalTrialRecord,
@@ -19,7 +22,7 @@ import type {
   SourceResult,
 } from "./types";
 
-export const BROWSER_EVIDENCE_CACHE_VERSION = "v1-pubmed-effects";
+export const BROWSER_EVIDENCE_CACHE_VERSION = "v2-pubchem-cid-identity";
 export const BROWSER_EVIDENCE_CACHE_TTL_MS = 6 * 60 * 60 * 1_000;
 
 const DEFAULT_LIMITS = {
@@ -38,11 +41,17 @@ export interface BrowserCompoundPayload {
   compound: {
     cid: number;
     title: string;
+    iupacName?: string;
     molecularFormula?: string;
     molecularWeight?: number;
+    charge?: number;
+    covalentUnitCount?: number;
+    definedAtomStereoCount?: number;
+    undefinedAtomStereoCount?: number;
     inchiKey?: string;
     isomericSmiles?: string;
     synonyms: string[];
+    entityNote?: string;
     structureUrl: string;
   };
   sources: Array<{
@@ -141,8 +150,39 @@ export interface BrowserAggregateOptions {
   now?: () => number;
 }
 
+export interface BrowserResolveOptions {
+  /** Base fetch used by tests or browser polyfills; unsafe headers are stripped. */
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+  maxCandidates?: number;
+  signal?: AbortSignal;
+}
+
+export interface BrowserCompoundCandidate {
+  cid: number;
+  title: string;
+  iupacName?: string;
+  molecularFormula?: string;
+  molecularWeight?: number;
+  charge?: number;
+  covalentUnitCount?: number;
+  definedAtomStereoCount?: number;
+  undefinedAtomStereoCount?: number;
+  inchiKey?: string;
+  isomericSmiles?: string;
+  entityNote?: string;
+}
+
+export interface BrowserCompoundResolution {
+  query: string;
+  queryKind: "cid" | "inchikey" | "name";
+  status: "resolved" | "ambiguous" | "not_found" | "unsupported" | "error";
+  candidates: BrowserCompoundCandidate[];
+  message?: string;
+}
+
 export class BrowserEvidenceError extends Error {
-  readonly code: "invalid_cid" | "unsupported_compound" | "aggregate_failed";
+  readonly code: "invalid_cid" | "compound_not_found" | "aggregate_failed";
 
   constructor(
     message: string,
@@ -156,7 +196,7 @@ export class BrowserEvidenceError extends Error {
 }
 
 function cacheKey(cid: number): string {
-  return `ginsenoside-evidence:${BROWSER_EVIDENCE_CACHE_VERSION}:${cid}`;
+  return `natural-product-evidence:${BROWSER_EVIDENCE_CACHE_VERSION}:cid:${cid}`;
 }
 
 function isBrowserCompoundPayload(
@@ -373,11 +413,17 @@ function mapPayload(
     compound: {
       cid: compound.cid,
       title: compound.title,
+      iupacName: compound.iupacName,
       molecularFormula: compound.molecularFormula,
       molecularWeight: compound.molecularWeight,
+      charge: compound.charge,
+      covalentUnitCount: compound.covalentUnitCount,
+      definedAtomStereoCount: compound.definedAtomStereoCount,
+      undefinedAtomStereoCount: compound.undefinedAtomStereoCount,
       inchiKey: compound.inchiKey,
       isomericSmiles: compound.isomericSmiles,
       synonyms: compound.synonyms,
+      entityNote: buildPubChemEntityNote(compound),
       structureUrl: `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${compound.cid}/PNG?record_type=2d`,
     },
     sources: [
@@ -461,13 +507,102 @@ function makeAbortError(): Error {
 }
 
 /**
- * Aggregates a catalog-confirmed ginsenoside directly from public browser APIs.
+ * Resolves a free-form compound query against PubChem from the static browser
+ * app. Names, CAS numbers, CIDs and full InChIKeys are accepted by PubChem.
+ * Ambiguous names remain explicit so the user can select one exact structure.
+ */
+export async function resolveBrowserCompound(
+  rawQuery: string,
+  options: BrowserResolveOptions = {},
+): Promise<BrowserCompoundResolution> {
+  const query = rawQuery.trim();
+  const queryKind = /^\d+$/.test(query)
+    ? "cid"
+    : /^[A-Z]{14}-[A-Z]{10}-[A-Z]$/i.test(query)
+      ? "inchikey"
+      : "name";
+  if (!query) {
+    return {
+      query,
+      queryKind,
+      status: "unsupported",
+      candidates: [],
+      message: "请输入化合物名称、CAS号、PubChem CID 或完整 InChIKey。",
+    };
+  }
+
+  const resolution = await resolvePubChemCompound(query, {
+    timeoutMs: options.timeoutMs ?? 12_000,
+    maxRecords: options.maxCandidates ?? 12,
+    fetchImpl: createBrowserFetchImpl(
+      withCallerSignal(options.fetchImpl ?? globalThis.fetch, options.signal),
+    ),
+  });
+  if (options.signal?.aborted) throw makeAbortError();
+
+  const candidates = resolution.candidates.map((candidate) => ({
+    cid: candidate.cid,
+    title: candidate.title,
+    iupacName: candidate.iupacName,
+    molecularFormula: candidate.molecularFormula,
+    molecularWeight: candidate.molecularWeight,
+    charge: candidate.charge,
+    covalentUnitCount: candidate.covalentUnitCount,
+    definedAtomStereoCount: candidate.definedAtomStereoCount,
+    undefinedAtomStereoCount: candidate.undefinedAtomStereoCount,
+    inchiKey: candidate.inchiKey,
+    isomericSmiles: candidate.isomericSmiles,
+    entityNote: buildPubChemEntityNote(candidate),
+  }));
+  if (resolution.source.status === "error") {
+    return {
+      query,
+      queryKind: resolution.queryKind,
+      status: "error",
+      candidates,
+      message: "PubChem 当前未能完成化合物解析，请稍后重试。",
+    };
+  }
+  if (resolution.status === "not_found") {
+    return {
+      query,
+      queryKind: resolution.queryKind,
+      status: "not_found",
+      candidates: [],
+      message: "PubChem 未找到匹配的化学实体，请核对名称、CAS号或结构标识符。",
+    };
+  }
+  if (resolution.status === "unsupported") {
+    return {
+      query,
+      queryKind: resolution.queryKind,
+      status: "unsupported",
+      candidates: [],
+      message: "当前查询无法解析，请使用名称、CAS号、CID 或完整 InChIKey。",
+    };
+  }
+  return {
+    query,
+    queryKind: resolution.queryKind,
+    status: candidates.length > 1 ? "ambiguous" : "resolved",
+    candidates,
+    message:
+      candidates.length > 1
+        ? `PubChem 返回 ${candidates.length} 个候选结构，请根据分子式和 InChIKey 选择。`
+        : undefined,
+  };
+}
+
+/**
+ * Aggregates one CID-confirmed natural product or small molecule directly
+ * from public browser APIs.
  *
  * EPO OPS and model extraction intentionally receive no credentials and are
- * therefore returned as `skipped`. All identity-sensitive lookups still use
- * the curated CID, complete InChIKey and the aggregate layer's stereoisomer
- * alias filter. A fresh result is cached for six hours in localStorage (or in
- * memory when storage is unavailable).
+ * therefore returned as `skipped`. On a cache miss, identity is resolved again
+ * from the CID. The evidence query and every alias then come only from the
+ * matching PubChem profile; a route/display query is never accepted here and
+ * therefore cannot contaminate the CID-keyed cache. A fresh result is cached
+ * for six hours in localStorage (or in memory when storage is unavailable).
  */
 export async function aggregateBrowserCompoundEvidence(
   cid: number,
@@ -475,14 +610,6 @@ export async function aggregateBrowserCompoundEvidence(
 ): Promise<BrowserCompoundPayload> {
   if (!Number.isSafeInteger(cid) || cid <= 0) {
     throw new BrowserEvidenceError("PubChem CID 格式无效", "invalid_cid");
-  }
-
-  const entry = getCatalogEntryByPubchemCid(cid);
-  if (!entry?.pubchemCid || !entry.pubchemInchiKey) {
-    throw new BrowserEvidenceError(
-      "首版仅支持目录内已核验的人参皂苷单体",
-      "unsupported_compound",
-    );
   }
 
   const now = options.now?.() ?? Date.now();
@@ -498,28 +625,33 @@ export async function aggregateBrowserCompoundEvidence(
     return cached.payload;
   }
 
-  const compound = {
-    cid,
-    title: entry.displayNameEn,
-    inchiKey: entry.pubchemInchiKey,
-    pubchemUrl: `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`,
-  };
-  const fallback: CompoundProfile = {
-    ...compound,
-    synonyms: [entry.displayNameZh, entry.displayNameEn, ...entry.aliases],
-    patentReferences: [],
-    patentReferenceCount: 0,
-  };
-
   try {
-    const aggregation = await aggregateCompoundEvidence({
-      query: entry.displayNameEn,
-      compound,
-      aliases: [entry.displayNameZh, entry.displayNameEn, ...entry.aliases],
+    const fetchImpl = createBrowserFetchImpl(
+      withCallerSignal(options.fetchImpl ?? globalThis.fetch, options.signal),
+    );
+    const identity = await resolvePubChemCompound(String(cid), {
       timeoutMs: options.timeoutMs ?? 15_000,
-      fetchImpl: createBrowserFetchImpl(
-        withCallerSignal(options.fetchImpl ?? globalThis.fetch, options.signal),
-      ),
+      maxRecords: 1,
+      fetchImpl,
+    });
+    if (identity.status !== "resolved" || !identity.selected) {
+      throw new BrowserEvidenceError(
+        `PubChem CID ${cid} 未返回可用的化学实体`,
+        "compound_not_found",
+      );
+    }
+    const compound = identity.selected;
+    const fallback: CompoundProfile = {
+      ...compound,
+      synonyms: [],
+      patentReferences: [],
+      patentReferenceCount: 0,
+    };
+    const aggregation = await aggregateCompoundEvidence({
+      query: compound.title,
+      compound,
+      timeoutMs: options.timeoutMs ?? 15_000,
+      fetchImpl,
       limits: DEFAULT_LIMITS,
       // No EPO credentials or model configuration are ever placed in a static
       // browser bundle. The shared aggregate layer reports both as skipped.

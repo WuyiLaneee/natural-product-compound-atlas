@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SearchForm } from "./components/SearchForm";
 import { SiteHeader } from "./components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "人参皂苷科研信息平台",
+  title: "天然产物及小分子化合物检索平台",
   description:
-    "面向人参皂苷研究与创新，汇聚化合物信息、功效研究、作用靶点、论文、临床试验与专利动态。",
+    "面向天然产物与小分子化合物研究，汇聚化学身份、活性靶点、功效机制、论文、临床试验与专利信息。",
 };
 
 const platformCapabilities = [
   ["01", "多源科研数据聚合", "连接化学、药理、论文、临床试验与专利信息"],
-  ["02", "化合物精准检索", "支持中英文名称、CAS、PubChem CID 等多种入口"],
+  ["02", "化合物精准检索", "支持常见中文快捷入口、英文名称、CAS、PubChem CID 等多种入口"],
   ["03", "功效与靶点洞察", "集中呈现研究功效、作用靶点与相关机制信息"],
   ["04", "文献与专利导航", "快速定位论文、试验登记与全球专利线索"],
   ["05", "智能科研辅助", "结构化梳理检索结果，助力科研探索与创新决策"],
@@ -25,6 +26,20 @@ const dataSources = [
   ["智能解析", "科研信息结构化整理", "扩展服务"],
 ];
 
+const popularCompounds = [
+  { name: "姜黄素", english: "Curcumin", cid: 969516, formula: "C₂₁H₂₀O₆" },
+  { name: "白藜芦醇", english: "Resveratrol", cid: 445154, formula: "C₁₄H₁₂O₃" },
+  { name: "槲皮素", english: "Quercetin", cid: 5280343, formula: "C₁₅H₁₀O₇" },
+  { name: "咖啡因", english: "Caffeine", cid: 2519, formula: "C₈H₁₀N₄O₂" },
+];
+
+const researchDirections = [
+  { title: "活性与靶点", note: "查看实验活性、测定对象与定量结果", href: "/methodology#evidence", code: "01" },
+  { title: "功效与机制", note: "连接研究模型、功效终点与机制线索", href: "/methodology#ai", code: "02" },
+  { title: "临床研究", note: "追踪试验设计、研究状态与临床终点", href: "/methodology#sources", code: "03" },
+  { title: "专利与应用", note: "发现专利家族、申请人及研发方向", href: "/methodology#patents", code: "04" },
+];
+
 export default function Home() {
   return (
     <main>
@@ -32,11 +47,11 @@ export default function Home() {
       <section className="hero-shell">
         <div className="hero-pattern" aria-hidden="true" />
         <div className="hero-copy">
-          <div className="eyebrow"><span /> GIANT BIOGENE · GINSENOSIDE RESEARCH</div>
-          <h1>从人参皂苷单体出发，<br />探索科研与创新价值</h1>
+          <div className="eyebrow"><span /> GIANT BIOGENE · NATURAL PRODUCT DISCOVERY</div>
+          <h1>探索天然产物与小分子，<br />连接科研与创新价值</h1>
           <p className="hero-lead">
-            汇聚化合物信息、功效研究、作用靶点、论文、临床试验与专利动态，
-            为科研探索与产品创新提供高效的信息支持。
+            从化学身份出发，汇聚活性靶点、功效机制、学术论文、临床试验与专利信息，
+            为天然产物研究、小分子发现与产品创新提供一站式信息支持。
           </p>
           <SearchForm />
         </div>
@@ -44,8 +59,8 @@ export default function Home() {
           <div className="orbit orbit-one"><i /><i /><i /></div>
           <div className="orbit orbit-two"><i /><i /></div>
           <div className="orbit-core">
-            <span>C<sub>42</sub>H<sub>72</sub>O<sub>14</sub></span>
-            <small>GINSENOSIDE</small>
+            <span>C · H · O · N</span>
+            <small>SMALL MOLECULE</small>
           </div>
         </div>
       </section>
@@ -62,13 +77,53 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="content-section evidence-intro">
+      <section className="content-section discovery-section" aria-labelledby="discovery-title">
+        <div className="section-heading discovery-heading">
+          <div>
+            <div className="eyebrow dark"><span /> START YOUR DISCOVERY</div>
+            <h2 id="discovery-title">从热门化合物出发，<br />进入多维研究视图</h2>
+          </div>
+          <p>选择一个代表性天然产物或研究方向，快速查看标准化化合物档案及其关联的科研信息。</p>
+        </div>
+        <div className="discovery-layout">
+          <div className="popular-compounds" aria-label="热门天然产物">
+            <div className="discovery-label">热门天然产物</div>
+            <div className="compound-link-grid">
+              {popularCompounds.map((compound, index) => (
+                <Link href={`/compound/${compound.cid}?q=${encodeURIComponent(compound.name)}`} className="compound-link-card" key={compound.cid}>
+                  <span className="compound-link-index">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="compound-link-copy">
+                    <strong>{compound.name}</strong>
+                    <small>{compound.english} · CID {compound.cid}</small>
+                  </span>
+                  <code>{compound.formula}</code>
+                  <span className="card-arrow" aria-hidden="true">↗</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div className="research-directions" aria-label="研究方向">
+            <div className="discovery-label">研究方向</div>
+            <div className="direction-link-grid">
+              {researchDirections.map((direction) => (
+                <Link href={direction.href} className="direction-link-card" key={direction.code}>
+                  <span>{direction.code}</span>
+                  <strong>{direction.title}</strong>
+                  <small>{direction.note}</small>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="content-section evidence-intro" id="platform-capabilities">
         <div className="section-heading">
           <div>
             <div className="eyebrow dark"><span /> RESEARCH INTELLIGENCE PLATFORM</div>
             <h2>汇聚科研信息，<br />连接创新灵感</h2>
           </div>
-          <p>围绕人参皂苷单体构建多维科研信息视图，帮助研究人员快速了解化合物特征、功效方向、作用靶点与全球研发动态。</p>
+          <p>围绕天然产物与小分子化合物构建多维科研信息视图，帮助研究人员快速了解化学特征、活性靶点、功效方向与全球研发动态。</p>
         </div>
         <div className="evidence-grid">
           {platformCapabilities.map(([level, title, note], index) => (
@@ -87,7 +142,7 @@ export default function Home() {
           <span>×</span>
           <img src="/brand/nwu.png" alt="西北大学" />
         </div>
-        <p>巨子生物 × 西北大学 · 人参皂苷科研信息平台</p>
+        <p>巨子生物 × 西北大学 · 天然产物及小分子化合物检索平台</p>
       </footer>
     </main>
   );
