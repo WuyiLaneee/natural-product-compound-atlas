@@ -7,3 +7,8 @@ export {
   type BrowserCompoundResolution,
   type BrowserResolveOptions,
 } from "../../../lib/evidence/browser-aggregate";
+
+export {
+  CHINESE_COMPOUND_ENTRIES,
+  findChineseCompoundSuggestions,
+} from "../../../lib/evidence/chinese-compounds";

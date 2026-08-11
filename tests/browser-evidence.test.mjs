@@ -252,6 +252,58 @@ test("browser resolver accepts any PubChem name and returns an exact structure c
   assert.equal(calls.length, 2);
 });
 
+test("browser resolver maps an exact Chinese compound name before querying PubChem", async () => {
+  const calls = [];
+  const fakeFetch = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("/compound/name/Quercetin/cids/JSON")) {
+      return Response.json({ IdentifierList: { CID: [5280343] } });
+    }
+    if (url.includes("/compound/cid/5280343/property/")) {
+      return Response.json({
+        PropertyTable: {
+          Properties: [{
+            CID: 5280343,
+            Title: "Quercetin",
+            MolecularFormula: "C15H10O7",
+            InChIKey: "REFJWTPEDVJJIY-UHFFFAOYSA-N",
+          }],
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const resolution = await browserAggregate.resolveBrowserCompound("槲皮素", {
+    fetchImpl: fakeFetch,
+  });
+
+  assert.equal(resolution.query, "槲皮素");
+  assert.equal(resolution.queryKind, "name");
+  assert.equal(resolution.status, "resolved");
+  assert.deepEqual(resolution.candidates.map((item) => item.cid), [5280343]);
+  assert.match(resolution.message, /已将槲皮素关联为Quercetin，请确认结构/);
+  assert.equal(calls.length, 2);
+});
+
+test("browser resolver explains when a Chinese compound name is not curated", async () => {
+  let fetchCalls = 0;
+  const resolution = await browserAggregate.resolveBrowserCompound("尚未收录的测试分子", {
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error("fetch should not be called for an unsupported Chinese name");
+    },
+  });
+
+  assert.equal(resolution.queryKind, "name");
+  assert.equal(resolution.status, "unsupported");
+  assert.deepEqual(resolution.candidates, []);
+  assert.match(resolution.message, /当前中文词库暂未收录/);
+  assert.match(resolution.message, /英文名、CAS号、PubChem CID/);
+  assert.equal(fetchCalls, 0);
+});
+
 test("short or family-like names remain explicit PubChem candidates", async () => {
   const fakeFetch = async (input) => {
     const url = String(input);

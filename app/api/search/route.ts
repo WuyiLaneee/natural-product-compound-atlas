@@ -4,6 +4,7 @@ import {
   requiresStructureConfirmation,
   toSearchCandidate,
 } from "@/lib/evidence/compound-api";
+import { resolveChineseCompoundName } from "@/lib/evidence/chinese-compounds";
 import { resolvePubChemCompound } from "@/lib/evidence/sources/pubchem";
 import { consumeRateLimit } from "@/lib/storage";
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   const query = typeof payload.query === "string" ? payload.query.trim() : "";
   if (!query || query.length > 160) {
     return Response.json(
-      { error: "请输入 1–160 个字符的化合物名称、CAS、PubChem CID 或完整 InChIKey" },
+      { error: "请输入 1–160 个字符的已收录中文名、英文名、CAS、PubChem CID 或完整 InChIKey" },
       { status: 400 },
     );
   }
@@ -49,7 +50,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const resolution = await resolvePubChemCompound(query, {
+  const chineseMatch = resolveChineseCompoundName(query);
+  const interpretedQuery = chineseMatch?.englishName ?? query;
+  const queryInterpretation = {
+    interpretedQuery,
+    ...(chineseMatch ? { matchedChineseName: chineseMatch.labelZh } : {}),
+  };
+
+  const resolution = await resolvePubChemCompound(interpretedQuery, {
     timeoutMs: 12_000,
     maxRecords: 12,
   });
@@ -59,13 +67,15 @@ export async function POST(request: Request) {
     return Response.json({
       status: "unavailable",
       error: "PubChem 化合物解析服务暂时不可用，请稍后重试。",
+      ...queryInterpretation,
     }, { status: 502 });
   }
 
   if (resolution.status === "not_found" || !candidates.length) {
     return Response.json({
       status: "not_found",
-      error: "PubChem 中未找到匹配化合物，请核对名称、CAS、CID 或完整 InChIKey。",
+      error: "PubChem 中未找到匹配化合物，请核对已收录中文名、英文名、CAS、CID 或完整 InChIKey。",
+      ...queryInterpretation,
     }, { status: 404 });
   }
 
@@ -80,6 +90,7 @@ export async function POST(request: Request) {
       candidates,
       totalAvailable: resolution.source.totalAvailable ?? candidates.length,
       truncated: resolution.source.truncated,
+      ...queryInterpretation,
     });
   }
 
@@ -87,5 +98,6 @@ export async function POST(request: Request) {
     status: "resolved",
     queryKind: resolution.queryKind,
     compound: toSearchCandidate(resolution.selected ?? resolution.candidates[0]),
+    ...queryInterpretation,
   });
 }

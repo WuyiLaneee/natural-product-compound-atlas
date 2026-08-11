@@ -1,6 +1,8 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import {
   aggregateBrowserCompoundEvidence,
+  CHINESE_COMPOUND_ENTRIES,
+  findChineseCompoundSuggestions,
   resolveBrowserCompound,
   type BrowserCompoundPayload,
   type BrowserCompoundCandidate,
@@ -119,6 +121,7 @@ function SearchModule({ compact = false, initialValue = "" }: { compact?: boolea
   const [query, setQuery] = useState(initialValue);
   const [message, setMessage] = useState("");
   const [candidates, setCandidates] = useState<BrowserCompoundCandidate[]>([]);
+  const [suggestions, setSuggestions] = useState<ReturnType<typeof findChineseCompoundSuggestions>>([]);
   const [resolving, setResolving] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
 
@@ -128,7 +131,7 @@ function SearchModule({ compact = false, initialValue = "" }: { compact?: boolea
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    setCandidates([]); setMessage(""); setResolving(true);
+    setCandidates([]); setSuggestions([]); setMessage(""); setResolving(true);
     try {
       const resolution = await resolveBrowserCompound(clean, { signal: controller.signal });
       if (resolution.candidates.length === 1 && (resolution.queryKind === "cid" || resolution.queryKind === "inchikey")) {
@@ -152,10 +155,32 @@ function SearchModule({ compact = false, initialValue = "" }: { compact?: boolea
     <form className="search-box" role="search" onSubmit={(event: FormEvent) => { event.preventDefault(); submit(); }}>
       <label className="sr-only" htmlFor={compact ? "search-compact" : "search-main"}>检索天然产物及小分子化合物</label>
       <span className="search-icon" aria-hidden="true" />
-      <input id={compact ? "search-compact" : "search-main"} value={query} onChange={(e) => { setQuery(e.target.value); setCandidates([]); setMessage(""); }} placeholder="输入名称、CAS、CID 或 InChIKey，如：Quercetin" autoComplete="off" />
+      <input
+        id={compact ? "search-compact" : "search-main"}
+        value={query}
+        onChange={(event) => {
+          const nextQuery = event.target.value;
+          setQuery(nextQuery);
+          setCandidates([]);
+          setMessage("");
+          setSuggestions(findChineseCompoundSuggestions(nextQuery));
+        }}
+        placeholder="输入中文名、英文名、CAS、CID 或 InChIKey，如：槲皮素"
+        autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={suggestions.length > 0}
+        aria-controls={suggestions.length > 0 ? `${compact ? "compact" : "main"}-chinese-suggestions` : undefined}
+      />
       <button type="submit" disabled={resolving}>{resolving ? "解析中" : "开始检索"} <span>→</span></button>
     </form>
+    {suggestions.length > 0 && <div className="search-suggestions" id={`${compact ? "compact" : "main"}-chinese-suggestions`} role="listbox" aria-label="中文化合物名称建议">
+      {suggestions.map((item) => <button type="button" role="option" aria-selected="false" key={`${item.labelZh}:${item.englishName}`} onClick={() => { setQuery(item.labelZh); submit(item.labelZh); }}>
+        <strong>{item.labelZh}</strong><span>{item.englishName}</span>
+      </button>)}
+    </div>}
     {!compact && <div className="example-chips"><span>快速查看：</span>{examples.slice(0, 4).map((item) => <button key={item.cid} onClick={() => navigateToCompound(item.cid, item.title)}>{item.labelZh}</button>)}</div>}
+    <p className="search-support-note">已收录 {CHINESE_COMPOUND_ENTRIES.length} 个常见化合物中文名称及常用别名；系统会先关联英文名称，再由您确认对应分子结构。</p>
     {message && <p className="search-message" role="status">{message}</p>}
     {candidates.length > 0 && <div className="candidate-grid" aria-label="PubChem 候选化学实体">{candidates.map((item) => <button key={item.cid} onClick={() => navigateToCompound(item.cid, query)}><img src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${item.cid}/PNG?record_type=2d&image_size=small`} alt="" /><span className="candidate-copy"><strong>{item.title}</strong>{item.iupacName && item.iupacName !== item.title && <small>IUPAC · {item.iupacName}</small>}<span>CID {item.cid} · {item.molecularFormula || "分子式未返回"}{item.charge !== undefined ? ` · 净电荷 ${item.charge}` : ""}{item.covalentUnitCount !== undefined ? ` · ${item.covalentUnitCount} 个共价单元` : ""}</span><code>{item.inchiKey || "InChIKey 未返回"}</code>{item.entityNote && <small className="candidate-entity-note">实体范围提示：{item.entityNote}</small>}</span><span className="candidate-action">确认此结构 →</span></button>)}</div>}
   </div>;

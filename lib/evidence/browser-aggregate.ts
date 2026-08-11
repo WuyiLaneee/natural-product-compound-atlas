@@ -1,4 +1,5 @@
 import { aggregateCompoundEvidence, inferEvidenceLevel } from "./aggregate";
+import { resolveChineseCompoundName } from "./chinese-compounds";
 import {
   readBrowserCache,
   removeBrowserCache,
@@ -24,6 +25,9 @@ import type {
 
 export const BROWSER_EVIDENCE_CACHE_VERSION = "v2-pubchem-cid-identity";
 export const BROWSER_EVIDENCE_CACHE_TTL_MS = 6 * 60 * 60 * 1_000;
+// Large Europe PMC result sets can take longer on cross-border connections.
+// Keep the static fallback patient enough to return literature/effect records.
+const DEFAULT_BROWSER_AGGREGATION_TIMEOUT_MS = 30_000;
 
 const DEFAULT_LIMITS = {
   pubchemPatents: 100,
@@ -508,7 +512,8 @@ function makeAbortError(): Error {
 
 /**
  * Resolves a free-form compound query against PubChem from the static browser
- * app. Names, CAS numbers, CIDs and full InChIKeys are accepted by PubChem.
+ * app. Curated Chinese names are converted to exact English names first;
+ * other names, CAS numbers, CIDs and full InChIKeys are accepted by PubChem.
  * Ambiguous names remain explicit so the user can select one exact structure.
  */
 export async function resolveBrowserCompound(
@@ -531,7 +536,21 @@ export async function resolveBrowserCompound(
     };
   }
 
-  const resolution = await resolvePubChemCompound(query, {
+  const chineseName = queryKind === "name"
+    ? resolveChineseCompoundName(query)
+    : undefined;
+  if (/\p{Script=Han}/u.test(query) && !chineseName) {
+    return {
+      query,
+      queryKind: "name",
+      status: "unsupported",
+      candidates: [],
+      message: `当前中文词库暂未收录“${query}”。请尝试输入准确的中文单体名称，或改用英文名、CAS号、PubChem CID 或完整 InChIKey。`,
+    };
+  }
+  const pubChemQuery = chineseName?.englishName ?? query;
+
+  const resolution = await resolvePubChemCompound(pubChemQuery, {
     timeoutMs: options.timeoutMs ?? 12_000,
     maxRecords: options.maxCandidates ?? 12,
     fetchImpl: createBrowserFetchImpl(
@@ -557,7 +576,7 @@ export async function resolveBrowserCompound(
   if (resolution.source.status === "error") {
     return {
       query,
-      queryKind: resolution.queryKind,
+      queryKind,
       status: "error",
       candidates,
       message: "PubChem 当前未能完成化合物解析，请稍后重试。",
@@ -566,16 +585,18 @@ export async function resolveBrowserCompound(
   if (resolution.status === "not_found") {
     return {
       query,
-      queryKind: resolution.queryKind,
+      queryKind,
       status: "not_found",
       candidates: [],
-      message: "PubChem 未找到匹配的化学实体，请核对名称、CAS号或结构标识符。",
+      message: chineseName
+        ? `已将${query}关联为${chineseName.englishName}，但 PubChem 未找到匹配的化学实体。`
+        : "PubChem 未找到匹配的化学实体，请核对名称、CAS号或结构标识符。",
     };
   }
   if (resolution.status === "unsupported") {
     return {
       query,
-      queryKind: resolution.queryKind,
+      queryKind,
       status: "unsupported",
       candidates: [],
       message: "当前查询无法解析，请使用名称、CAS号、CID 或完整 InChIKey。",
@@ -583,11 +604,14 @@ export async function resolveBrowserCompound(
   }
   return {
     query,
-    queryKind: resolution.queryKind,
+    queryKind,
     status: candidates.length > 1 ? "ambiguous" : "resolved",
     candidates,
-    message:
-      candidates.length > 1
+    message: chineseName
+      ? candidates.length > 1
+        ? `已将${query}关联为${chineseName.englishName}；PubChem 返回 ${candidates.length} 个候选结构，请确认结构、分子式和 InChIKey。`
+        : `已将${query}关联为${chineseName.englishName}，请确认结构、分子式和 InChIKey。`
+      : candidates.length > 1
         ? `PubChem 返回 ${candidates.length} 个候选结构，请根据分子式和 InChIKey 选择。`
         : undefined,
   };
@@ -630,7 +654,7 @@ export async function aggregateBrowserCompoundEvidence(
       withCallerSignal(options.fetchImpl ?? globalThis.fetch, options.signal),
     );
     const identity = await resolvePubChemCompound(String(cid), {
-      timeoutMs: options.timeoutMs ?? 15_000,
+      timeoutMs: options.timeoutMs ?? DEFAULT_BROWSER_AGGREGATION_TIMEOUT_MS,
       maxRecords: 1,
       fetchImpl,
     });
@@ -650,7 +674,7 @@ export async function aggregateBrowserCompoundEvidence(
     const aggregation = await aggregateCompoundEvidence({
       query: compound.title,
       compound,
-      timeoutMs: options.timeoutMs ?? 15_000,
+      timeoutMs: options.timeoutMs ?? DEFAULT_BROWSER_AGGREGATION_TIMEOUT_MS,
       fetchImpl,
       limits: DEFAULT_LIMITS,
       // No EPO credentials or model configuration are ever placed in a static

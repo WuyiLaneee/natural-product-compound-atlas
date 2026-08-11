@@ -2,6 +2,11 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  CHINESE_COMPOUND_ENTRIES,
+  findChineseCompoundSuggestions,
+  resolveChineseCompoundName,
+} from "@/lib/evidence/chinese-compounds";
 
 type Candidate = {
   cid: number;
@@ -18,12 +23,7 @@ type Candidate = {
   structureUrl?: string;
 };
 
-const examples = [
-  { label: "姜黄素", query: "Curcumin" },
-  { label: "白藜芦醇", query: "Resveratrol" },
-  { label: "槲皮素", query: "Quercetin" },
-  { label: "咖啡因", query: "Caffeine" },
-] as const;
+const examples = ["姜黄素", "白藜芦醇", "槲皮素", "咖啡因"] as const;
 
 export function SearchForm({ compact = false, initialValue = "" }: { compact?: boolean; initialValue?: string }) {
   const router = useRouter();
@@ -31,37 +31,35 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [submittedQuery, setSubmittedQuery] = useState("");
   const suggestions = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return [];
-    return examples.filter((item) =>
-      `${item.label} ${item.query}`.toLowerCase().includes(needle)
-      && item.label !== query
-      && item.query.toLowerCase() !== needle,
-    ).slice(0, 4);
+    if (!query.trim()) return [];
+    const exactMatch = resolveChineseCompoundName(query);
+    return findChineseCompoundSuggestions(query, 6)
+      .filter((item) => item !== exactMatch);
   }, [query]);
 
   async function submit(value = query) {
     const clean = value.trim();
-    if (!clean) { setMessage("请输入化合物名称、CAS、PubChem CID 或 InChIKey"); return; }
-    const apiQuery = examples.find((item) =>
-      item.label === clean || item.query.toLowerCase() === clean.toLowerCase(),
-    )?.query ?? clean;
+    if (!clean) { setMessage("请输入已收录中文名、英文名、CAS、PubChem CID 或 InChIKey"); return; }
+    setSubmittedQuery(clean);
     setLoading(true); setMessage(""); setCandidates([]);
     try {
       const response = await fetch("/api/search", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query: apiQuery }),
+        body: JSON.stringify({ query: clean }),
       });
       const data = await response.json() as {
         status?: string;
         error?: string;
         compound?: Candidate;
         candidates?: Candidate[];
+        interpretedQuery?: string;
+        matchedChineseName?: string;
       };
       if (!response.ok) {
-        const responseMessage = data.error || "未找到匹配化合物，请检查英文名称、CAS、CID 或 InChIKey";
+        const responseMessage = data.error || "未找到匹配化合物，请检查已收录中文名、英文名、CAS、CID 或 InChIKey";
         throw new Error(responseMessage);
       }
       if (data.status === "resolved" && data.compound) {
@@ -70,9 +68,12 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
       }
       if (data.status === "ambiguous" && data.candidates?.length) {
         setCandidates(data.candidates);
-        setMessage(data.candidates.length === 1
-          ? "PubChem 将输入解释为以下实体，请核对结构、分子式和 InChIKey 后确认。"
-          : `PubChem 返回 ${data.candidates.length} 个可能的化学实体，请根据结构、分子式和 InChIKey 选择。`);
+        const interpretation = data.matchedChineseName && data.interpretedQuery
+          ? `已将“${clean}”关联为 ${data.interpretedQuery}。`
+          : "";
+        setMessage(interpretation + (data.candidates.length === 1
+          ? "PubChem 返回以下化学实体，请核对结构、分子式和 InChIKey 后确认。"
+          : `PubChem 返回 ${data.candidates.length} 个可能的化学实体，请根据结构、分子式和 InChIKey 选择。`));
       } else {
         setMessage(data.error || "未在公开化合物数据中找到匹配项");
       }
@@ -94,22 +95,32 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
           id={compact ? "compound-search-compact" : "compound-search"}
           value={query}
           onChange={(event) => { setQuery(event.target.value); setCandidates([]); setMessage(""); }}
-          placeholder="输入英文名称、CAS、PubChem CID 或 InChIKey，如：Curcumin"
+          placeholder="输入中文/英文名、CAS、PubChem CID 或 InChIKey，如：姜黄素"
           autoComplete="off"
         />
         <button type="submit" disabled={loading}>{loading ? "正在解析…" : "开始检索"}<span>→</span></button>
       </form>
       {suggestions.length > 0 && (
         <div className="search-suggestions" role="listbox" aria-label="检索建议">
-          {suggestions.map((item) => <button key={item.query} onClick={() => { setQuery(item.label); void submit(item.query); }}>{item.label} · {item.query}</button>)}
+          {suggestions.map((item) => (
+            <button key={item.labelZh} type="button" onClick={() => { setQuery(item.labelZh); void submit(item.labelZh); }}>
+              <strong>{item.labelZh}</strong>
+              <small>{item.englishName}{item.category ? ` · ${item.category}` : ""}</small>
+            </button>
+          ))}
         </div>
       )}
-      {!compact && <div className="example-chips"><span>中文快捷入口：</span>{examples.map((item) => <button key={item.query} onClick={() => { setQuery(item.label); void submit(item.query); }}>{item.label}</button>)}</div>}
+      {!compact && (
+        <>
+          <div className="example-chips"><span>中文快捷入口：</span>{examples.map((item) => <button key={item} type="button" onClick={() => { setQuery(item); void submit(item); }}>{item}</button>)}</div>
+          <p className="search-context-note">已收录 {CHINESE_COMPOUND_ENTRIES.length} 个常见化合物中文名称及常用别名；结构确认后，平台将聚合功效、靶点、学术论文与临床研究信息。</p>
+        </>
+      )}
       {message && <p className="search-message" role="status">{message}</p>}
       {candidates.length > 0 && (
         <div className="candidate-grid">
           {candidates.map((candidate) => (
-            <button key={candidate.cid} className="candidate-card" onClick={() => router.push(`/compound/${candidate.cid}?q=${encodeURIComponent(query)}`)}>
+            <button key={candidate.cid} className="candidate-card" onClick={() => router.push(`/compound/${candidate.cid}?q=${encodeURIComponent(submittedQuery || query)}`)}>
               {candidate.structureUrl && <img src={candidate.structureUrl} alt={`${candidate.title} 二维结构`} />}
               <span>
                 <strong>{candidate.title}</strong>
