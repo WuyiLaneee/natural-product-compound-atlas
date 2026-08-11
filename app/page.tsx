@@ -19,7 +19,7 @@ const platformCapabilities = [
 const dataSources = [
   ["PubChem", "化合物身份与同义词", "实时"],
   ["ChEMBL", "实验活性与靶点", "实时"],
-  ["Europe PMC", "论文与开放全文标注", "实时"],
+  ["PubMed / Europe PMC", "生物医学论文、摘要与开放全文", "实时"],
   ["ClinicalTrials.gov", "临床试验与终点", "实时"],
   ["EPO OPS", "全球专利信息与研发动态", "扩展服务"],
   ["智能解析", "科研信息结构化整理", "扩展服务"],

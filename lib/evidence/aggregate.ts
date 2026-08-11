@@ -17,6 +17,7 @@ import type {
   SourceResult,
 } from "./types";
 import { fetchChEMBLActivities } from "./sources/chembl";
+import { extractPublicationEffectClaims } from "./publication-effects";
 import { searchClinicalTrials } from "./sources/clinical-trials";
 import {
   makeSourceResult,
@@ -163,6 +164,7 @@ export function dedupeEvidenceClaims(records: EvidenceClaim[]): EvidenceClaim[] 
       record.source.sourceId,
       record.claimType,
       normalizeTitle(record.summary),
+      normalizeTitle(record.effect ?? ""),
       normalizeTitle(record.target ?? ""),
     ].join("|");
     if (seen.has(key)) return false;
@@ -243,7 +245,8 @@ function profilePatentRecords(profile: CompoundProfile): PatentRecord[] {
 function scientificAliases(input: AggregateCompoundEvidenceInput, profile: CompoundProfile): string[] {
   return uniqueStrings([
     profile.title,
-    input.query,
+    input.compound?.title,
+    ...(input.compound ? [] : [input.query]),
     ...(input.aliases ?? []),
     ...profile.synonyms,
   ])
@@ -258,9 +261,38 @@ function scientificAliases(input: AggregateCompoundEvidenceInput, profile: Compo
       // uses compound-specific names only; short aliases remain available for
       // catalog lookup and UI display, but never become upstream evidence
       // queries by themselves.
-      return /ginsenoside|notoginsenoside|pseudoginsenoside|compound\s*k|人参皂苷|三七皂苷|拟人参皂苷/i.test(term);
+      return (
+        /ginsenoside|notoginsenoside|pseudoginsenoside|compound\s*k|人参皂苷|三七皂苷|拟人参皂苷/i.test(term) ||
+        /^20\s*(?:\(\s*[SR]\s*\)|[SR])[-\s]?[A-Z]+\d*/i.test(term)
+      );
     })
     .slice(0, 6);
+}
+
+function publicationEffectAliases(
+  input: AggregateCompoundEvidenceInput,
+  profile: CompoundProfile,
+  aliases: string[],
+): string[] {
+  // PubChem's preferred title can collapse an explicit 20(S)/20(R) catalog
+  // identity back to the generic parent name. Prefer the caller-confirmed
+  // structure title so generic Rg2/Rg3/Rh records cannot populate a specific
+  // stereoisomer page.
+  const identityTitle = input.compound?.title ?? input.query ?? profile.title;
+  const stereoMatch = identityTitle.match(/20\s*\(\s*([SR])\s*\)/iu);
+  if (!stereoMatch) return aliases;
+
+  const configuration = stereoMatch[1].toLocaleUpperCase();
+  const stereoAliases = aliases.filter((alias) => {
+    const compact = alias.normalize("NFKC").replace(/\s+/gu, "").toLocaleUpperCase();
+    return (
+      compact.includes(`20(${configuration})`) ||
+      compact.includes(`20${configuration}-`) ||
+      compact.startsWith(`${configuration}-GINSENOSIDE`)
+    );
+  });
+
+  return stereoAliases.length > 0 ? stereoAliases : [identityTitle];
 }
 
 function sourceText(parts: Array<string | undefined>): string {
@@ -449,13 +481,17 @@ export async function aggregateCompoundEvidence(
     fetchImpl: input.fetchImpl,
     maxPatentReferences: limits.pubchemPatents,
   });
-  const profile: CompoundProfile = pubchem.records[0] ?? {
+  const fetchedProfile: CompoundProfile = pubchem.records[0] ?? {
     ...resolution.selected,
     synonyms: [],
     patentReferences: [],
     patentReferenceCount: 0,
   };
+  const profile: CompoundProfile = input.compound
+    ? { ...fetchedProfile, title: input.compound.title }
+    : fetchedProfile;
   const aliases = scientificAliases(input, profile);
+  const preciseAliases = publicationEffectAliases(input, profile, aliases);
   const requestOptions = { timeoutMs: input.timeoutMs, fetchImpl: input.fetchImpl };
 
   const [chembl, europePmc, clinicalTrials, epoOps] = await Promise.all([
@@ -464,19 +500,19 @@ export async function aggregateCompoundEvidence(
       maxRecords: limits.chemblActivities,
       pageSize: Math.min(100, limits.chemblActivities),
     }),
-    searchEuropePmcPublications(aliases, {
+    searchEuropePmcPublications(preciseAliases, {
       ...requestOptions,
       maxRecords: limits.publications,
       pageSize: Math.min(25, limits.publications),
     }),
-    searchClinicalTrials(aliases, {
+    searchClinicalTrials(preciseAliases, {
       ...requestOptions,
       maxRecords: limits.trials,
       pageSize: Math.min(25, limits.trials),
     }),
     searchEpoOpsPatents(profile.title, input.epo, {
       ...requestOptions,
-      aliases,
+      aliases: preciseAliases,
       publicationNumbers: profile.patentReferences.map(
         (reference) => reference.publicationNumber,
       ),
@@ -516,6 +552,14 @@ export async function aggregateCompoundEvidence(
         }
       : undefined,
   );
+  const publicationEffectClaims = extractPublicationEffectClaims(
+    publications,
+    preciseAliases,
+    {
+      maxClaims: 40,
+      maxClaimsPerPublication: 3,
+    },
+  );
 
   return {
     query: input.query,
@@ -528,6 +572,9 @@ export async function aggregateCompoundEvidence(
     targets: Array.from(targetMap.values()),
     trials,
     patents,
-    claims: dedupeEvidenceClaims(model.records),
+    claims: dedupeEvidenceClaims([
+      ...publicationEffectClaims,
+      ...model.records,
+    ]),
   };
 }

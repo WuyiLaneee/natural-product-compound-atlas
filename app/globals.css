@@ -238,6 +238,20 @@ img { max-width: 100%; }
 .record-card h3 { margin: 0 0 8px; font-size: 15px; line-height: 1.55; }
 .record-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .record-card a { color: var(--blue); }
+.claim-card { position: relative; }
+.effect-claim-card { border-left: 3px solid var(--green); padding-left: 19px; }
+.claim-effect-label { display: inline-flex; align-items: center; min-height: 23px; padding: 4px 9px; border-radius: 4px; background: var(--green); color: white; font-size: 11px; font-weight: 700; line-height: 1.25; }
+.claim-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 1px; margin: 14px 0; padding: 1px; background: var(--line); }
+.claim-detail-grid div { min-width: 0; padding: 11px 12px; background: #fafbf8; }
+.claim-detail-grid dt { margin-bottom: 5px; color: var(--muted); font: 600 9px/1.25 var(--font-geist-mono), monospace; letter-spacing: .06em; }
+.claim-detail-grid dd { margin: 0; color: var(--ink); font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
+.record-card .claim-snippet { margin-top: 13px; color: #526579; }
+.claim-snippet strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 10px; }
+.claim-source-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line); }
+.claim-source-row > span { flex: 0 0 auto; color: var(--muted); font: 600 9px/1.25 var(--font-geist-mono), monospace; letter-spacing: .06em; }
+.claim-source-copy { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 7px 14px; text-align: right; }
+.claim-source-copy strong { color: var(--ink); font-size: 11px; }
+.claim-source-copy a { font-size: 11px; font-weight: 650; }
 .empty-state { padding: 55px 25px; text-align: center; color: var(--muted); }
 .empty-state strong { display: block; color: var(--ink); margin-bottom: 8px; }
 .activity-table { overflow-x: auto; }
@@ -296,6 +310,9 @@ img { max-width: 100%; }
   .metric-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .metric-card { min-height: 110px; padding: 16px; }
   .panel-heading { align-items: flex-start; flex-direction: column; }
+  .claim-detail-grid { grid-template-columns: 1fr; }
+  .claim-source-row { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .claim-source-copy { align-items: flex-start; flex-direction: column; text-align: left; }
 }
 
 @media (max-width: 360px) {

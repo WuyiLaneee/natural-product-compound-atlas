@@ -21,7 +21,7 @@ import {
 export const runtime = "edge";
 
 const CACHE_SOURCE = "evidence_aggregate";
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2-pubmed-effects";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function clientIp(request: Request): string {
@@ -151,10 +151,15 @@ function mapClaim(record: EvidenceClaim, index: number) {
     : record.claimType === "mechanism"
       ? "mechanism"
       : "effect";
+  const isPubMedRecord = record.source.source === "europe_pmc";
+  const pmid = isPubMedRecord && /^\d{5,9}$/.test(record.source.sourceId)
+    ? record.source.sourceId
+    : undefined;
   return {
     id: `${record.source.source}:${record.source.sourceId}:${index}`,
     kind,
     label: record.summary,
+    effect: record.effect,
     target: record.target,
     direction: record.direction,
     evidenceLevel: record.evidenceLevel,
@@ -163,9 +168,17 @@ function mapClaim(record: EvidenceClaim, index: number) {
     dose: record.dose,
     endpoint: record.endpoints.join("；") || undefined,
     snippet: record.source.excerpt,
-    sourceTitle: `${record.source.source} · ${record.source.sourceId}`,
+    sourceLocator: record.source.locator,
+    source: record.source.source,
+    sourceId: record.source.sourceId,
+    pmid,
+    sourceTitle: pmid
+      ? `PubMed · PMID ${pmid}`
+      : `${isPubMedRecord ? "PubMed / Europe PMC" : record.source.source} · ${record.source.sourceId}`,
     sourceUrl: record.source.sourceUrl,
-    reviewStatus: "AI 辅助整理",
+    reviewStatus: record.modelName === "pubmed_rule_v1"
+      ? "PubMed 文献筛选"
+      : "AI 辅助整理",
     isPredicted: record.evidenceLevel === "T5",
   };
 }
@@ -189,7 +202,7 @@ function mapPayload(aggregation: EvidenceAggregation, fallback: CompoundProfile)
     sources: [
       mapSource("PubChem", sourceResults.pubchem),
       mapSource("ChEMBL", sourceResults.chembl),
-      mapSource("Europe PMC", sourceResults.europePmc),
+      mapSource("PubMed / Europe PMC", sourceResults.europePmc),
       mapSource("ClinicalTrials.gov", sourceResults.clinicalTrials),
       mapSource("EPO OPS", sourceResults.epoOps),
       mapSource("智能解析", sourceResults.model),
@@ -274,7 +287,10 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
     );
   }
 
-  const query = new URL(request.url).searchParams.get("q")?.trim() || entry.displayNameEn;
+  // The CID and catalog entry are the confirmed chemical identity. The page's
+  // optional q parameter is presentation context only and must never alter the
+  // evidence query or poison the CID-scoped cache with another compound.
+  const query = entry.displayNameEn;
   const compound = {
     cid,
     title: entry.displayNameEn,

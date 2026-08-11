@@ -8,7 +8,28 @@ type Literature = { id: string; title: string; authors?: string[]; year?: number
 type Patent = { id: string; title: string; publicationNumber?: string; applicant?: string; priorityDate?: string; relation?: string; legalStatus?: string; abstract?: string; url?: string; familyId?: string };
 type Trial = { id: string; title: string; status?: string; phase?: string; conditions?: string[]; enrollment?: number; intervention?: string; resultsAvailable?: boolean; url?: string };
 type Activity = { id: string; targetName: string; targetOrganism?: string; targetType?: string; assayType?: string; standardType?: string; standardValue?: number | string; standardUnits?: string; pchemblValue?: number | string; confidenceScore?: number; evidenceLevel?: string; documentUrl?: string };
-type Claim = { id: string; kind: "effect" | "target" | "mechanism"; label: string; target?: string; direction?: string; evidenceLevel?: string; model?: string; organism?: string; dose?: string; endpoint?: string; snippet?: string; sourceTitle?: string; sourceUrl?: string; reviewStatus?: string; isPredicted?: boolean };
+type Claim = {
+  id: string;
+  kind: "effect" | "target" | "mechanism";
+  label: string;
+  effect?: string;
+  target?: string;
+  direction?: string;
+  evidenceLevel?: string;
+  model?: string;
+  organism?: string;
+  dose?: string;
+  endpoint?: string;
+  snippet?: string;
+  sourceLocator?: string;
+  source?: string;
+  sourceId?: string;
+  sourceTitle?: string;
+  sourceUrl?: string;
+  pmid?: string;
+  reviewStatus?: string;
+  isPredicted?: boolean;
+};
 type Payload = { compound: Compound; sources: SourceState[]; literature: Literature[]; patents: Patent[]; trials: Trial[]; bioactivities: Activity[]; claims: Claim[]; coverageNote?: string };
 
 const tabLabels = [
@@ -46,7 +67,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
   const targetClaims = payload?.claims.filter((item) => item.kind === "target" || item.kind === "mechanism") ?? [];
 
   if (error) return <div className="result-error"><strong>数据聚合暂未完成</strong><p>{error}</p><p>请检查化合物编号或稍后重试。</p></div>;
-  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在汇聚化合物与科研数据</strong><p>PubChem · ChEMBL · Europe PMC · ClinicalTrials · Patents</p></div></div>;
+  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在汇聚化合物与科研数据</strong><p>PubChem · ChEMBL · PubMed / Europe PMC · ClinicalTrials · Patents</p></div></div>;
 
   const { compound } = payload;
   return (
@@ -96,7 +117,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
           </>
         )}
 
-        {tab === "effects" && <RecordSection title="功效研究进展" note="按实验模型、剂量、研究终点与物种维度整理"><ClaimsList records={effectClaims} empty="当前暂无结构化功效信息，可前往学术论文查看相关研究。" /></RecordSection>}
+        {tab === "effects" && <RecordSection title="功效研究进展" note="从 PubMed 文献中筛选功效、研究模型、物种与研究终点"><ClaimsList records={effectClaims} empty="当前尚未生成结构化功效条目。平台将从 PubMed 收录文献的题录与摘要中，筛选与当前人参皂苷单体直接相关的功效、研究模型、物种和研究终点，完成后将在此展示。" /></RecordSection>}
 
         {tab === "targets" && (
           <>
@@ -149,18 +170,94 @@ function TrialList({ records }: { records: Trial[] }) {
 
 function ClaimsList({ records, empty }: { records: Claim[]; empty: string }) {
   if (!records.length) return <Empty>{empty}</Empty>;
-  return <div className="record-list">{records.map((item) => <article className="record-card" key={item.id}>
-    <div className="record-meta"><span className={`badge ${item.isPredicted ? "gold" : "green"}`}>{formatResearchType(item.evidenceLevel, item.isPredicted)}</span><span className="badge gray">{formatReviewStatus(item.reviewStatus)}</span></div>
-    <h3>{item.label}{item.target ? ` · ${item.target}` : ""}</h3>
-    <p>{[item.direction, item.model, item.organism, item.dose, item.endpoint].filter(Boolean).join(" · ")}</p>
-    {item.snippet && <p>研究摘要：{item.snippet}</p>}
-    {item.sourceUrl && <p><a href={item.sourceUrl} target="_blank" rel="noreferrer">查看研究来源：{item.sourceTitle || item.sourceUrl} ↗</a></p>}
-  </article>)}</div>;
+  return <div className="record-list">{records.map((item) => {
+    const isEffect = item.kind === "effect";
+    const pmid = getClaimPmid(item);
+    const details = [
+      item.model && ["研究模型", formatStudyModel(item.model)],
+      item.organism && ["物种 / 对象", item.organism],
+      item.dose && ["给药剂量", item.dose],
+      item.endpoint && ["研究终点", item.endpoint],
+      item.direction && ["作用方向", formatDirection(item.direction)],
+    ].filter(Boolean) as string[][];
+
+    return <article className={`record-card claim-card${isEffect ? " effect-claim-card" : ""}`} key={item.id}>
+      <div className="record-meta">
+        {isEffect && <span className="claim-effect-label">{item.effect || "功效研究"}</span>}
+        <span className={`badge ${item.isPredicted ? "gold" : "green"}`}>{formatResearchType(item.evidenceLevel, item.isPredicted)}</span>
+        <span className="badge gray">{formatReviewStatus(item, pmid)}</span>
+      </div>
+      <h3>{item.label}{item.target ? ` · ${item.target}` : ""}</h3>
+      {details.length > 0 && <dl className="claim-detail-grid">
+        {details.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+      </dl>}
+      {item.snippet && <p className="claim-snippet"><strong>{item.sourceLocator === "title" ? "题录依据" : "摘要依据"}</strong>{item.snippet}</p>}
+      <div className="claim-source-row">
+        <span>文献来源</span>
+        <div className="claim-source-copy">
+          <strong>{formatClaimSource(item, pmid)}</strong>
+          {item.sourceUrl && <a href={item.sourceUrl} target="_blank" rel="noreferrer">{isPubMedClaim(item, pmid) ? "查看 PubMed / Europe PMC 原文" : "查看研究来源"} ↗</a>}
+        </div>
+      </div>
+    </article>;
+  })}</div>;
 }
 
-function formatReviewStatus(status?: string) {
-  if (!status || /机器抽取|未审核/.test(status)) return "AI 辅助整理";
-  return status;
+function getClaimPmid(item: Claim) {
+  if (item.pmid) return item.pmid.replace(/^PMID\s*:?\s*/i, "").trim();
+  const sourceText = [item.source, item.sourceId, item.sourceTitle, item.sourceUrl].filter(Boolean).join(" ");
+  const explicitMatch = sourceText.match(/(?:PMID\s*:?\s*|pubmed(?:\.ncbi\.nlm\.nih\.gov)?\/)(\d{5,9})/i);
+  if (explicitMatch) return explicitMatch[1];
+  const europePmcUrlMatch = sourceText.match(/europepmc\.org\/article\/MED\/(\d{5,9})/i);
+  if (europePmcUrlMatch) return europePmcUrlMatch[1];
+  const europePmcIdMatch = sourceText.match(/europe[_\s-]?pmc\s*(?:·|:|-)?\s*(?!PMC)(\d{5,9})\b/i);
+  return europePmcIdMatch?.[1];
+}
+
+function formatReviewStatus(item: Claim, pmid?: string) {
+  if (/AI 辅助整理/i.test(item.reviewStatus || "")) return "AI 辅助整理";
+  if (/PubMed 文献筛选/i.test(item.reviewStatus || "")) return "PubMed 文献筛选";
+  if (isPubMedClaim(item, pmid)) return "PubMed 文献筛选";
+  if (!item.reviewStatus || /机器抽取|未审核/.test(item.reviewStatus)) return "AI 辅助整理";
+  return item.reviewStatus;
+}
+
+function isPubMedClaim(item: Claim, pmid?: string) {
+  const sourceText = [item.source, item.sourceTitle, item.sourceUrl].filter(Boolean).join(" ");
+  return Boolean(pmid || /pubmed|europe[_\s-]?pmc/i.test(sourceText) || /PubMed 文献筛选/i.test(item.reviewStatus || ""));
+}
+
+function formatClaimSource(item: Claim, pmid?: string) {
+  if (pmid) return `PubMed · PMID ${pmid}`;
+  const source = item.sourceTitle || [item.source, item.sourceId].filter(Boolean).join(" · ");
+  if (!source) return "来源信息整理中";
+  if (/PubMed\s*\/\s*Europe PMC/i.test(source)) return source;
+  return source.replace(/europe[_\s-]?pmc/i, "PubMed / Europe PMC");
+}
+
+function formatStudyModel(model: string) {
+  const labels: Record<string, string> = {
+    biochemical: "生化实验",
+    cell: "细胞模型",
+    animal: "动物模型",
+    human: "人体研究",
+    computational: "计算研究",
+    other: "多模型 / 未明确",
+  };
+  return model.split(" · ").map((part) => labels[part.toLowerCase()] || part).join(" · ");
+}
+
+function formatDirection(direction: string) {
+  const labels: Record<string, string> = {
+    increase: "升高",
+    decrease: "降低",
+    activate: "激活",
+    inhibit: "抑制",
+    bind: "结合",
+    mixed: "改善 / 调节",
+    unknown: "待明确",
+  };
+  return labels[direction.toLowerCase()] || direction;
 }
 
 function formatSourceMessage(source: SourceState) {
@@ -170,6 +267,7 @@ function formatSourceMessage(source: SourceState) {
 }
 
 function formatSourceName(source: string) {
+  if (/europe[_\s-]?pmc/i.test(source)) return "PubMed / Europe PMC";
   return /机器抽取|单位模型/.test(source) ? "智能解析" : source;
 }
 
