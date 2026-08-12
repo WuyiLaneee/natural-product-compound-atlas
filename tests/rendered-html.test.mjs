@@ -27,6 +27,7 @@ test("server-renders the phytochemistry database homepage without legacy brandin
   assert.match(html, /<html lang="zh-CN">/i);
   assert.match(html, /中国日化前沿靶点与植物化学数据库大模型/);
   assert.match(html, /中国日化前沿靶点与植物化学数据库大模型算力中心/);
+  assert.match(html, /CHINA FRONTIER DATABASE FOR PERSONAL CARE TARGETS &amp; PHYTOCHEMISTRY/);
   assert.match(html, /PubChem/);
   assert.match(html, /ChEMBL/);
   assert.match(html, /Europe PMC/);

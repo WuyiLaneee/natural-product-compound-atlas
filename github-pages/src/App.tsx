@@ -58,7 +58,11 @@ export function App() {
 function Header({ compact = false }: { compact?: boolean }) {
   return <header className={`site-header${compact ? " compact" : ""}`}>
     <a href="#/" className="brand-lockup" aria-label="返回首页">
-      <span className="brand-monogram" aria-hidden="true">AI</span>
+      <span className="brand-monogram" aria-hidden="true">
+        <span className="brand-leaves"><i /><i /></span>
+        <span className="brand-target"><i /></span>
+        <span className="brand-database"><i /><i /><i /></span>
+      </span>
       <span className="product-name">中国日化前沿靶点与<br />植物化学数据库大模型</span>
     </a>
     <div className="header-edition" title="数据来源：中国日化前沿靶点与植物化学数据库大模型算力中心">
@@ -209,7 +213,7 @@ function CompoundPage({ cid, query }: { cid: number; query: string }) {
 }
 
 function LoadingState() {
-  return <section className="result-loading" aria-live="polite"><div className="loading-orbit" /><p className="eyebrow dark"><span /> LIVE RESEARCH DATA</p><h1>正在连接中国日化前沿靶点与植物化学数据库大模型</h1><p>正在连接 PubChem、ChEMBL、PubMed / Europe PMC 与 ClinicalTrials.gov</p><div className="loading-sources"><span>化合物身份</span><span>功效论文</span><span>靶点活性</span><span>临床研究</span></div></section>;
+  return <section className="result-loading" aria-live="polite"><div className="loading-orbit" /><p className="eyebrow dark"><span /> LIVE RESEARCH DATA</p><h1>正在连接中国日化前沿靶点与植物化学数据库大模型</h1><p>同时链接 PubChem、ChEMBL、PubMed / Europe PMC 与 ClinicalTrials.gov</p><div className="loading-sources"><span>化合物身份</span><span>功效论文</span><span>靶点活性</span><span>临床研究</span></div></section>;
 }
 
 function ErrorState({ message, retry }: { message: string; retry: () => void }) {
@@ -223,6 +227,7 @@ function CompoundResult({ payload, query, tab, setTab }: { payload: BrowserCompo
   const uniqueTargets = new Set(payload.bioactivities.map((x) => x.targetName).filter(Boolean)).size;
   const matchedChineseEntry = resolveChineseCompoundName(query);
   const confirmedChineseEntry = matchedChineseEntry?.cid === compound.cid ? matchedChineseEntry : undefined;
+  const generatedDate = resultGeneratedDate(payload.coverageNote);
   return <>
     <a href="#/" className="back-link">← 返回检索首页</a>
     <section className="identity-panel">
@@ -230,10 +235,10 @@ function CompoundResult({ payload, query, tab, setTab }: { payload: BrowserCompo
       <div className="identity-copy"><p className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</p><h1>{compound.title}</h1>{confirmedChineseEntry && <p className="chinese-identity-line"><span>中文名称</span><strong>{confirmedChineseEntry.labelZh}</strong><small>CSV 精确关联 CID {confirmedChineseEntry.cid}</small></p>}<p className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || "相关名称整理中"}</p>{compound.iupacName && <p className="iupac-line"><span>IUPAC</span>{compound.iupacName}</p>}<div className="identity-facts"><div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div><div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div><div><span>净电荷</span><strong>{compound.charge ?? "—"}</strong></div><div><span>共价单元</span><strong>{compound.covalentUnitCount ?? "—"}</strong></div><div><span>InChIKey</span><code>{compound.inchiKey || "—"}</code></div><div><span>原子立体中心</span><strong>{compound.definedAtomStereoCount !== undefined || compound.undefinedAtomStereoCount !== undefined ? `${compound.definedAtomStereoCount ?? 0} 已定义 · ${compound.undefinedAtomStereoCount ?? 0} 未定义` : "—"}</strong></div><div><span>Isomeric SMILES</span><code title={compound.isomericSmiles}>{compound.isomericSmiles ? `${compound.isomericSmiles.slice(0, 30)}…` : "—"}</code></div></div>{compound.entityNote && <aside className="entity-note"><strong>实体范围提示</strong><span>{compound.entityNote}</span></aside>}</div>
     </section>
     <div className="coverage-row">{payload.sources.filter((source) => !/EPO|机器抽取|单位模型|智能解析/i.test(source.source)).map((source) => <span className={`status-pill ${source.status}`} key={source.source} title={source.message}><i />{sourceName(source.source)}{typeof source.count === "number" ? ` · ${source.count}` : ""}</span>)}</div>
-    {payload.coverageNote && <p className="coverage-note">{payload.coverageNote}</p>}
+    {generatedDate && <p className="coverage-note">结果生成日期：{generatedDate}</p>}
     <nav className="result-tabs" aria-label="结果分类">{tabs.map(([key, label]) => <button className={tab === key ? "active" : ""} key={key} onClick={() => setTab(key)}>{label}</button>)}</nav>
     <div className="tab-panel">
-      {tab === "overview" && <><div className="metric-grid"><Metric label="实验活性靶点" value={uniqueTargets} note="ChEMBL 活性记录" /><Metric label="功效 / 机制" value={effects.length + targets.length} note="PubMed 文献筛选" /><Metric label="学术论文" value={payload.literature.length} note="PMID / DOI" /><Metric label="临床研究" value={payload.trials.length} note="ClinicalTrials.gov" /></div><Panel title="相关功效摘要" note="确认 PubChem CID 后，从 PubMed / Europe PMC 题录与摘要中筛选"><ClaimList records={effects.slice(0, 6)} empty="当前公开文献中尚未筛选出可结构化展示的功效条目。" /></Panel><Panel title="代表性研究" note="优先展示与当前化合物相关的公开论文"><LiteratureList records={payload.literature.slice(0, 6)} /></Panel></>}
+      {tab === "overview" && <><div className="metric-grid"><Metric label="实验活性靶点" value={uniqueTargets} note="ChEMBL 活性记录" /><Metric label="功效 / 机制" value={effects.length + targets.length} note="PubMed 文献筛选" /><Metric label="学术论文" value={payload.literature.length} note="PMID / DOI" /><Metric label="临床研究" value={payload.trials.length} note="ClinicalTrials.gov" /></div><Panel title="相关功效摘要"><ClaimList records={effects.slice(0, 6)} empty="当前公开文献中尚未筛选出可结构化展示的功效条目。" /></Panel><Panel title="代表性研究" note="优先展示与当前化合物相关的公开论文"><LiteratureList records={payload.literature.slice(0, 6)} /></Panel></>}
       {tab === "effects" && <Panel title="功效研究进展" note="从 PubMed 文献筛选研究功效、模型与终点"><ClaimList records={effects} empty="当前公开文献中尚未筛选出可结构化展示的功效条目。" /></Panel>}
       {tab === "targets" && <><Panel title="靶点活性数据" note="按精确化学实体汇总 ChEMBL 活性记录"><ActivityTable records={payload.bioactivities} /></Panel><Panel title="机制研究与候选靶点" note="来自公开论文的机制信息"><ClaimList records={targets} empty="当前暂无结构化机制条目。" /></Panel></>}
       {tab === "literature" && <Panel title="学术研究成果" note="题录、摘要、PMID、DOI 与原始链接"><LiteratureList records={payload.literature} /></Panel>}
@@ -244,7 +249,7 @@ function CompoundResult({ payload, query, tab, setTab }: { payload: BrowserCompo
 }
 
 function Metric({ label, value, note }: { label: string; value: number; note: string }) { return <article className="metric-card"><span>{label}</span><strong>{value}</strong><small>{note}</small></article>; }
-function Panel({ title, note, children }: { title: string; note: string; children: ReactNode }) { return <section className="panel-section"><header><h2>{title}</h2><span>{note}</span></header>{children}</section>; }
+function Panel({ title, note, children }: { title: string; note?: string; children: ReactNode }) { return <section className="panel-section"><header><h2>{title}</h2>{note && <span>{note}</span>}</header>{children}</section>; }
 function Empty({ children }: { children: ReactNode }) { return <div className="empty-state"><span className="empty-icon" /><strong>暂无相关记录</strong><p>{children}</p></div>; }
 
 function LiteratureList({ records }: { records: BrowserCompoundPayload["literature"] }) {
@@ -278,4 +283,15 @@ function sourceName(source: string) {
   return source;
 }
 
-function Footer() { return <footer className="site-footer"><p>中国日化前沿靶点与植物化学数据库</p></footer>; }
+function resultGeneratedDate(coverageNote?: string) {
+  const match = coverageNote?.match(/(\d{4})[/.年-](\d{1,2})[/.月-](\d{1,2})/);
+  return match ? `${match[1]}/${match[2]}/${match[3]}` : "";
+}
+
+function Footer() {
+  return <footer className="site-footer">
+    <span className="footer-constellation" aria-hidden="true"><i /><i /><i /></span>
+    <p>中国日化前沿靶点与植物化学数据库</p>
+    <small lang="en">CHINA FRONTIER DATABASE FOR PERSONAL CARE TARGETS &amp; PHYTOCHEMISTRY</small>
+  </footer>;
+}

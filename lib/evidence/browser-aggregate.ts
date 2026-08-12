@@ -414,9 +414,6 @@ function mapPayload(
 ): BrowserCompoundPayload {
   const compound = aggregation.compound ?? fallback;
   const sources = aggregation.sources;
-  const degraded = Object.values(sources).filter(
-    (source) => source.status !== "success",
-  ).length;
 
   return {
     compound: {
@@ -448,7 +445,7 @@ function mapPayload(
     trials: aggregation.trials.map(mapTrial),
     bioactivities: aggregation.bioactivities.map(mapActivity),
     claims: aggregation.claims.map(mapClaim),
-    coverageNote: `结果生成于 ${new Date(aggregation.generatedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}；已汇聚当前接入数据库的可用科研信息${degraded ? `，${degraded} 个来源正在等待更新或扩展接入` : ""}。`,
+    coverageNote: `结果生成日期：${new Date(aggregation.generatedAt).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai" })}`,
   };
 }
 
@@ -470,12 +467,12 @@ function stalePayload(
   payload: BrowserCompoundPayload,
   savedAt: number,
 ): BrowserCompoundPayload {
-  const timestamp = new Date(savedAt).toLocaleString("zh-CN", {
+  const timestamp = new Date(savedAt).toLocaleDateString("zh-CN", {
     timeZone: "Asia/Shanghai",
   });
   return {
     ...payload,
-    coverageNote: `当前数据源连接暂不稳定，正在显示 ${timestamp} 保存的检索结果。`,
+    coverageNote: `结果生成日期：${timestamp}`,
   };
 }
 

@@ -137,7 +137,9 @@ export default function Home() {
       </section>
 
       <footer className="site-footer">
+        <div className="footer-brand-rule" aria-hidden="true"><i /><span>PHYTOCHEMISTRY · TARGET INTELLIGENCE</span><i /></div>
         <p className="footer-database-name">中国日化前沿靶点与植物化学数据库</p>
+        <p className="footer-database-name-en" lang="en">CHINA FRONTIER DATABASE FOR PERSONAL CARE TARGETS &amp; PHYTOCHEMISTRY</p>
       </footer>
     </main>
   );

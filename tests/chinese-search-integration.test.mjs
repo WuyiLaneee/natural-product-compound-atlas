@@ -150,7 +150,7 @@ test("SearchForm submits the user's term and uses the shared Chinese suggestion 
   assert.doesNotMatch(source, /已收录.*常见化合物中文名称及常用别名/);
 });
 
-test("both result UIs expose CID-confirmed PubMed effect summaries for Chinese searches", async () => {
+test("both result UIs expose concise CID-confirmed research summaries", async () => {
   const [pagesSource, sitesSource] = await Promise.all([
     readFile(new URL("../github-pages/src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/CompoundExplorer.tsx", import.meta.url), "utf8"),
@@ -159,6 +159,20 @@ test("both result UIs expose CID-confirmed PubMed effect summaries for Chinese s
   for (const source of [pagesSource, sitesSource]) {
     assert.match(source, /CSV 精确关联 CID/);
     assert.match(source, /相关功效摘要/);
-    assert.match(source, /PubMed \/ Europe PMC 题录与摘要中筛选/);
+    assert.match(source, /同时链接 PubChem/);
+    assert.match(source, /结果生成日期/);
+    assert.doesNotMatch(source, /确认 PubChem CID 后，从 PubMed \/ Europe PMC 题录与摘要中筛选/);
+  }
+});
+
+test("result payloads expose only the generation date in coverage copy", async () => {
+  const [browserAggregate, compoundRoute] = await Promise.all([
+    readFile(new URL("../lib/evidence/browser-aggregate.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/compound/[cid]/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  for (const source of [browserAggregate, compoundRoute]) {
+    assert.match(source, /结果生成日期/);
+    assert.doesNotMatch(source, /已汇聚当前接入数据库|正在等待更新或扩展接入/);
   }
 });

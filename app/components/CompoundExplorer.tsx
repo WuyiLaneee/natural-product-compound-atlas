@@ -83,7 +83,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
   const targetClaims = payload?.claims.filter((item) => item.kind === "target" || item.kind === "mechanism") ?? [];
 
   if (error) return <div className="result-error"><strong>数据聚合暂未完成</strong><p>{error}</p><p>请检查化合物编号或稍后重试。</p></div>;
-  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在连接中国日化前沿靶点与植物化学数据库大模型算力中心</strong><p>PubChem · ChEMBL · PubMed / Europe PMC · ClinicalTrials · Patents</p></div></div>;
+  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在连接中国日化前沿靶点与植物化学数据库大模型算力中心</strong><p>同时链接 PubChem、ChEMBL、PubMed / Europe PMC 与 ClinicalTrials.gov</p></div></div>;
 
   const { compound } = payload;
   const matchedChineseEntry = query ? resolveChineseCompoundName(query) : undefined;
@@ -120,6 +120,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
           </span>
         ))}
       </div>
+      {formatGeneratedDate(payload.coverageNote) && <p className="coverage-note">{formatGeneratedDate(payload.coverageNote)}</p>}
 
       <nav className="result-tabs" aria-label="结果分类">
         {tabLabels.map(([key, label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}>{label}</button>)}
@@ -134,7 +135,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
               <div className="metric-card"><span>学术论文</span><strong>{payload.literature.length}</strong><small>汇总 DOI / PMID</small></div>
               <div className="metric-card"><span>专利信息</span><strong>{payload.patents.length}</strong><small>按专利族整理</small></div>
             </div>
-            <RecordSection title="相关功效摘要" note="确认 PubChem CID 后，从 PubMed / Europe PMC 题录与摘要中筛选">
+            <RecordSection title="相关功效摘要">
               <ClaimsList records={effectClaims.slice(0, 6)} empty="当前公开文献中尚未筛选出可结构化展示的功效条目。" />
             </RecordSection>
             <RecordSection title="代表性研究" note="优先展示与当前化合物高度相关的论文记录">
@@ -160,8 +161,13 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
   );
 }
 
-function RecordSection({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
-  return <section className="panel-section"><header className="panel-heading"><h2>{title}</h2><span>{note}</span></header>{children}</section>;
+function RecordSection({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+  return <section className="panel-section"><header className="panel-heading"><h2>{title}</h2>{note && <span>{note}</span>}</header>{children}</section>;
+}
+
+function formatGeneratedDate(note?: string) {
+  const match = note?.match(/(\d{4})[/.年-](\d{1,2})[/.月-](\d{1,2})/);
+  return match ? `结果生成日期：${match[1]}/${match[2]}/${match[3]}` : "";
 }
 
 function Empty({ children }: { children: React.ReactNode }) { return <div className="empty-state"><strong>暂无相关记录</strong><span>{children}</span></div>; }

@@ -194,7 +194,6 @@ function mapClaim(record: EvidenceClaim, index: number) {
 function mapPayload(aggregation: EvidenceAggregation, fallback: CompoundProfile) {
   const compound = aggregation.compound ?? fallback;
   const sourceResults = aggregation.sources;
-  const degraded = Object.values(sourceResults).filter((source) => source.status !== "success").length;
 
   return {
     compound: {
@@ -226,7 +225,7 @@ function mapPayload(aggregation: EvidenceAggregation, fallback: CompoundProfile)
     trials: aggregation.trials.map(mapTrial),
     bioactivities: aggregation.bioactivities.map(mapActivity),
     claims: aggregation.claims.map(mapClaim),
-    coverageNote: `结果生成于 ${new Date(aggregation.generatedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}；已汇聚当前接入数据库的可用科研信息${degraded ? `，${degraded} 个来源正在等待更新或扩展接入` : ""}。`,
+    coverageNote: `结果生成日期：${new Date(aggregation.generatedAt).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai" })}`,
   };
 }
 
