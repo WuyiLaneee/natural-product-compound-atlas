@@ -48,20 +48,21 @@ export default function Home() {
         <div className="hero-pattern" aria-hidden="true" />
         <div className="hero-copy">
           <div className="eyebrow"><span /> GIANT BIOGENE · NATURAL PRODUCT DISCOVERY</div>
-          <h1>探索天然产物与小分子，<br />连接科研与创新价值</h1>
-          <p className="hero-lead">
-            从化学身份出发，汇聚活性靶点、功效机制、学术论文、临床试验与专利信息，
-            为天然产物研究、小分子发现与产品创新提供一站式信息支持。
-          </p>
+          <h1>天然产物与小分子<br />的智能发现平台</h1>
+          <p className="hero-lead">连接化学结构、生物活性、分子靶点及文献数据</p>
           <SearchForm />
+          <div className="compute-status"><i aria-hidden="true" />已连接巨子生物AI算力中心</div>
         </div>
-        <div className="molecule-orbit" aria-hidden="true">
-          <div className="orbit orbit-one"><i /><i /><i /></div>
-          <div className="orbit orbit-two"><i /><i /></div>
-          <div className="orbit-core">
-            <span>C · H · O · N</span>
-            <small>SMALL MOLECULE</small>
-          </div>
+        <div className="intelligence-map" aria-hidden="true">
+          <span className="map-kicker">MOLECULAR INTELLIGENCE</span>
+          <i className="map-link link-structure" /><i className="map-link link-activity" />
+          <i className="map-link link-target" /><i className="map-link link-literature" />
+          <div className="map-core"><strong>AI</strong><span>DISCOVERY<br />ENGINE</span></div>
+          <div className="map-node node-structure"><em>01</em><span><strong>化学结构</strong><small>STRUCTURE</small></span></div>
+          <div className="map-node node-activity"><em>02</em><span><strong>生物活性</strong><small>BIOACTIVITY</small></span></div>
+          <div className="map-node node-target"><em>03</em><span><strong>分子靶点</strong><small>TARGETS</small></span></div>
+          <div className="map-node node-literature"><em>04</em><span><strong>科学文献</strong><small>LITERATURE</small></span></div>
+          <span className="map-status"><i /> CONNECTED DATA GRAPH</span>
         </div>
       </section>
 

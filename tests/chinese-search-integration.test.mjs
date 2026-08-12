@@ -111,5 +111,6 @@ test("SearchForm submits the user's term and uses the shared Chinese suggestion 
   assert.match(source, /findChineseCompoundSuggestions\(query,\s*6\)/);
   assert.match(source, /JSON\.stringify\(\{ query: clean \}\)/);
   assert.doesNotMatch(source, /apiQuery/);
-  assert.match(source, /功效、靶点、学术论文与临床研究信息/);
+  assert.match(source, /中文快捷入口/);
+  assert.doesNotMatch(source, /已收录.*常见化合物中文名称及常用别名/);
 });

@@ -1,7 +1,6 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import {
   aggregateBrowserCompoundEvidence,
-  CHINESE_COMPOUND_ENTRIES,
   findChineseCompoundSuggestions,
   resolveBrowserCompound,
   type BrowserCompoundPayload,
@@ -68,9 +67,9 @@ function Header({ compact = false }: { compact?: boolean }) {
       <span className="brand-divider" />
       <span className="product-name">天然产物及小分子<br />化合物检索平台</span>
     </a>
-    <div className="header-edition" title="当前为 GitHub Pages 公开数据入口">
+    <div className="header-edition" title="数据来源：巨子生物AI算力中心">
       <span className="edition-dot" />
-      <span><small>PUBLIC DATA EDITION</small><strong>公开数据入口</strong></span>
+      <span><small>AI COMPUTING CENTER</small><strong>巨子生物AI算力中心</strong></span>
     </div>
   </header>;
 }
@@ -82,14 +81,21 @@ function HomePage() {
       <div className="hero-grid" aria-hidden="true" />
       <div className="hero-copy">
         <p className="eyebrow"><span /> GIANT BIOGENE · MOLECULAR DISCOVERY</p>
-        <h1>从一个化合物出发，<br />连接全球公开科研信息</h1>
-        <p className="hero-lead">面向天然产物及小分子化合物，检索化学身份、功效研究、实验靶点、学术论文与临床研究。</p>
+        <h1>天然产物与小分子<br />的智能发现平台</h1>
+        <p className="hero-lead">连接化学结构、生物活性、分子靶点及文献数据</p>
         <SearchModule />
-        <div className="public-scope"><i />当前入口直接连接公开数据库；EPO 深度专利与智能解析将在腾讯云正式入口开放。</div>
+        <div className="public-scope"><i />已连接巨子生物AI算力中心</div>
       </div>
-      <div className="molecule-orbit" aria-hidden="true">
-        <div className="orbit orbit-a"><i /><i /><i /></div><div className="orbit orbit-b"><i /><i /></div>
-        <div className="orbit-core"><strong>C<sub>x</sub>H<sub>y</sub>O<sub>z</sub></strong><span>COMPOUND SPACE</span></div>
+      <div className="intelligence-map" aria-hidden="true">
+        <span className="map-kicker">MOLECULAR INTELLIGENCE</span>
+        <i className="map-link link-structure" /><i className="map-link link-activity" />
+        <i className="map-link link-target" /><i className="map-link link-literature" />
+        <div className="map-core"><strong>AI</strong><span>DISCOVERY<br />ENGINE</span></div>
+        <div className="map-node node-structure"><em>01</em><span><strong>化学结构</strong><small>STRUCTURE</small></span></div>
+        <div className="map-node node-activity"><em>02</em><span><strong>生物活性</strong><small>BIOACTIVITY</small></span></div>
+        <div className="map-node node-target"><em>03</em><span><strong>分子靶点</strong><small>TARGETS</small></span></div>
+        <div className="map-node node-literature"><em>04</em><span><strong>科学文献</strong><small>LITERATURE</small></span></div>
+        <span className="map-status"><i /> CONNECTED DATA GRAPH</span>
       </div>
     </section>
 
@@ -180,7 +186,6 @@ function SearchModule({ compact = false, initialValue = "" }: { compact?: boolea
       </button>)}
     </div>}
     {!compact && <div className="example-chips"><span>快速查看：</span>{examples.slice(0, 4).map((item) => <button key={item.cid} onClick={() => navigateToCompound(item.cid, item.title)}>{item.labelZh}</button>)}</div>}
-    <p className="search-support-note">已收录 {CHINESE_COMPOUND_ENTRIES.length} 个常见化合物中文名称及常用别名；系统会先关联英文名称，再由您确认对应分子结构。</p>
     {message && <p className="search-message" role="status">{message}</p>}
     {candidates.length > 0 && <div className="candidate-grid" aria-label="PubChem 候选化学实体">{candidates.map((item) => <button key={item.cid} onClick={() => navigateToCompound(item.cid, query)}><img src={`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${item.cid}/PNG?record_type=2d&image_size=small`} alt="" /><span className="candidate-copy"><strong>{item.title}</strong>{item.iupacName && item.iupacName !== item.title && <small>IUPAC · {item.iupacName}</small>}<span>CID {item.cid} · {item.molecularFormula || "分子式未返回"}{item.charge !== undefined ? ` · 净电荷 ${item.charge}` : ""}{item.covalentUnitCount !== undefined ? ` · ${item.covalentUnitCount} 个共价单元` : ""}</span><code>{item.inchiKey || "InChIKey 未返回"}</code>{item.entityNote && <small className="candidate-entity-note">实体范围提示：{item.entityNote}</small>}</span><span className="candidate-action">确认此结构 →</span></button>)}</div>}
   </div>;
@@ -278,4 +283,4 @@ function sourceName(source: string) {
   return source;
 }
 
-function Footer() { return <footer className="site-footer"><div><img src={asset("brand/giant-biogene.png")} alt="巨子生物" /><span>×</span><img src={asset("brand/nwu.png")} alt="西北大学" /></div><p>巨子生物 × 西北大学 · 天然产物及小分子化合物检索平台</p><small>PUBLIC DATA EDITION · 公开数据入口</small></footer>; }
+function Footer() { return <footer className="site-footer"><div><img src={asset("brand/giant-biogene.png")} alt="巨子生物" /><span>×</span><img src={asset("brand/nwu.png")} alt="西北大学" /></div><p>巨子生物 × 西北大学 · 天然产物及小分子化合物检索平台</p><small>AI COMPUTING CENTER · 巨子生物AI算力中心</small></footer>; }

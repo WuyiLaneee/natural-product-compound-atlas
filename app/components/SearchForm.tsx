@@ -3,7 +3,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CHINESE_COMPOUND_ENTRIES,
   findChineseCompoundSuggestions,
   resolveChineseCompoundName,
 } from "@/lib/evidence/chinese-compounds";
@@ -110,12 +109,7 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
           ))}
         </div>
       )}
-      {!compact && (
-        <>
-          <div className="example-chips"><span>中文快捷入口：</span>{examples.map((item) => <button key={item} type="button" onClick={() => { setQuery(item); void submit(item); }}>{item}</button>)}</div>
-          <p className="search-context-note">已收录 {CHINESE_COMPOUND_ENTRIES.length} 个常见化合物中文名称及常用别名；结构确认后，平台将聚合功效、靶点、学术论文与临床研究信息。</p>
-        </>
-      )}
+      {!compact && <div className="example-chips"><span>中文快捷入口：</span>{examples.map((item) => <button key={item} type="button" onClick={() => { setQuery(item); void submit(item); }}>{item}</button>)}</div>}
       {message && <p className="search-message" role="status">{message}</p>}
       {candidates.length > 0 && (
         <div className="candidate-grid">
