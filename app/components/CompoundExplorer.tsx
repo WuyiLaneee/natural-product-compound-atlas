@@ -110,7 +110,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
       </section>
 
       <div className="coverage-row" aria-label="数据源接入状态">
-        {payload.sources.map((source) => (
+        {payload.sources.filter((source) => !/EPO|机器抽取|单位模型|智能解析/i.test(source.source)).map((source) => (
           <span key={source.source} className={`status-pill ${source.status}`} title={formatSourceMessage(source)}>
             <i />{formatSourceName(source.source)}{source.status === "skipped" ? " · 扩展服务" : typeof source.count === "number" ? ` · ${source.count}` : ""}
           </span>

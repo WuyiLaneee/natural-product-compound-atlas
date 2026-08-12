@@ -81,7 +81,7 @@ function HomePage() {
       <div className="hero-grid" aria-hidden="true" />
       <div className="hero-copy">
         <p className="eyebrow"><span /> GIANT BIOGENE · MOLECULAR DISCOVERY</p>
-        <h1>天然产物与小分子<br />的智能发现平台</h1>
+        <h1>天然产物与小分子化合物<br />智能发现平台</h1>
         <p className="hero-lead">连接化学结构、生物活性、分子靶点及文献数据</p>
         <SearchModule />
         <div className="public-scope"><i />已连接巨子生物AI算力中心</div>
@@ -234,7 +234,7 @@ function CompoundResult({ payload, tab, setTab }: { payload: BrowserCompoundPayl
       <div className="structure-box"><img src={compound.structureUrl || `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${compound.cid}/PNG?record_type=2d`} alt={`${compound.title} 二维结构`} /></div>
       <div className="identity-copy"><p className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</p><h1>{compound.title}</h1><p className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || "相关名称整理中"}</p>{compound.iupacName && <p className="iupac-line"><span>IUPAC</span>{compound.iupacName}</p>}<div className="identity-facts"><div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div><div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div><div><span>净电荷</span><strong>{compound.charge ?? "—"}</strong></div><div><span>共价单元</span><strong>{compound.covalentUnitCount ?? "—"}</strong></div><div><span>InChIKey</span><code>{compound.inchiKey || "—"}</code></div><div><span>原子立体中心</span><strong>{compound.definedAtomStereoCount !== undefined || compound.undefinedAtomStereoCount !== undefined ? `${compound.definedAtomStereoCount ?? 0} 已定义 · ${compound.undefinedAtomStereoCount ?? 0} 未定义` : "—"}</strong></div><div><span>Isomeric SMILES</span><code title={compound.isomericSmiles}>{compound.isomericSmiles ? `${compound.isomericSmiles.slice(0, 30)}…` : "—"}</code></div></div>{compound.entityNote && <aside className="entity-note"><strong>实体范围提示</strong><span>{compound.entityNote}</span></aside>}</div>
     </section>
-    <div className="coverage-row">{payload.sources.filter((source) => !/EPO|机器抽取|单位模型|智能解析/i.test(source.source)).map((source) => <span className={`status-pill ${source.status}`} key={source.source} title={source.message}><i />{sourceName(source.source)}{typeof source.count === "number" ? ` · ${source.count}` : ""}</span>)}<span className="status-pill locked"><i />EPO / 智能解析 · 腾讯云入口</span></div>
+    <div className="coverage-row">{payload.sources.filter((source) => !/EPO|机器抽取|单位模型|智能解析/i.test(source.source)).map((source) => <span className={`status-pill ${source.status}`} key={source.source} title={source.message}><i />{sourceName(source.source)}{typeof source.count === "number" ? ` · ${source.count}` : ""}</span>)}</div>
     {payload.coverageNote && <p className="coverage-note">{payload.coverageNote}</p>}
     <nav className="result-tabs" aria-label="结果分类">{tabs.map(([key, label]) => <button className={tab === key ? "active" : ""} key={key} onClick={() => setTab(key)}>{label}</button>)}</nav>
     <div className="tab-panel">

@@ -48,7 +48,7 @@ export default function Home() {
         <div className="hero-pattern" aria-hidden="true" />
         <div className="hero-copy">
           <div className="eyebrow"><span /> GIANT BIOGENE · NATURAL PRODUCT DISCOVERY</div>
-          <h1>天然产物与小分子<br />的智能发现平台</h1>
+          <h1>天然产物与小分子化合物<br />智能发现平台</h1>
           <p className="hero-lead">连接化学结构、生物活性、分子靶点及文献数据</p>
           <SearchForm />
           <div className="compute-status"><i aria-hidden="true" />已连接巨子生物AI算力中心</div>

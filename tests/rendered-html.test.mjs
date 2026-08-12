@@ -26,8 +26,8 @@ test("server-renders the natural-product and small-molecule homepage", async () 
   const html = await response.text();
   assert.match(html, /<html lang="zh-CN">/i);
   assert.match(html, /天然产物及小分子化合物检索平台/);
-  assert.match(html, /探索天然产物与小分子/);
-  assert.match(html, /连接科研与创新价值/);
+  assert.match(html, /天然产物与小分子化合物/);
+  assert.match(html, /智能发现平台/);
   assert.match(html, /PubChem/);
   assert.match(html, /ChEMBL/);
   assert.match(html, /Europe PMC/);

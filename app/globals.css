@@ -364,6 +364,10 @@ img { max-width: 100%; }
   .header-platform-signature { display: none; }
 }
 
+@media (max-width: 520px) {
+  .hero-copy h1 { font-size: clamp(25px,8vw,34px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
