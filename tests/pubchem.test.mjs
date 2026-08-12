@@ -41,14 +41,16 @@ function propertyFetch(property) {
     const url = String(input);
     assert.match(url, new RegExp(`/compound/cid/${property.CID}/property/`));
     for (const field of [
-      "IUPACName",
       "Charge",
       "CovalentUnitCount",
       "DefinedAtomStereoCount",
       "UndefinedAtomStereoCount",
+      "InChIKey",
     ]) {
       assert.match(url, new RegExp(field));
     }
+    assert.doesNotMatch(url, /IUPACName/);
+    assert.doesNotMatch(url, /IsomericSMILES/);
     return new Response(
       JSON.stringify({ PropertyTable: { Properties: [property] } }),
       { headers: { "content-type": "application/json" } },
@@ -61,7 +63,6 @@ test("PubChem CID 5234 preserves salt entity metadata", async () => {
     fetchImpl: propertyFetch({
       CID: 5234,
       Title: "Sodium Chloride",
-      IUPACName: "sodium chloride",
       MolecularFormula: "ClNa",
       MolecularWeight: "58.44",
       Charge: 0,
@@ -76,7 +77,7 @@ test("PubChem CID 5234 preserves salt entity metadata", async () => {
   });
 
   assert.equal(resolution.status, "resolved");
-  assert.equal(resolution.selected.iupacName, "sodium chloride");
+  assert.equal(resolution.selected.iupacName, undefined);
   assert.equal(resolution.selected.charge, 0);
   assert.equal(resolution.selected.covalentUnitCount, 2);
   assert.equal(resolution.selected.definedAtomStereoCount, 0);
@@ -91,7 +92,6 @@ test("ordinary single-component PubChem records are not marked multi-component",
     fetchImpl: propertyFetch({
       CID: 2244,
       Title: "Aspirin",
-      IUPACName: "2-acetyloxybenzoic acid",
       MolecularFormula: "C9H8O4",
       MolecularWeight: 180.16,
       Charge: "0",
@@ -105,7 +105,7 @@ test("ordinary single-component PubChem records are not marked multi-component",
   });
 
   assert.equal(resolution.status, "resolved");
-  assert.equal(resolution.selected.iupacName, "2-acetyloxybenzoic acid");
+  assert.equal(resolution.selected.iupacName, undefined);
   assert.equal(resolution.selected.covalentUnitCount, 1);
   assert.equal(pubchem.isMultiComponentCompound(resolution.selected), false);
   assert.equal(pubchem.buildPubChemEntityNote(resolution.selected), undefined);
@@ -117,4 +117,42 @@ test("dot-separated SMILES remains a fallback for older cached entities", () => 
   };
   assert.equal(pubchem.isMultiComponentCompound(legacyEntity), true);
   assert.match(pubchem.buildPubChemEntityNote(legacyEntity), /多个共价单元/);
+});
+
+test("PubChem resolution retries one transient server error", async () => {
+  let attempts = 0;
+  const resolution = await pubchem.resolvePubChemCompound("12912363", {
+    fetchImpl: async (input) => {
+      attempts += 1;
+      assert.match(String(input), /\/compound\/cid\/12912363\/property\//);
+      if (attempts === 1) {
+        return new Response("PubChem server busy", { status: 503 });
+      }
+      return new Response(
+        JSON.stringify({
+          PropertyTable: {
+            Properties: [
+              {
+                CID: 12912363,
+                Title: "Ginsenoside Rb3",
+                MolecularFormula: "C53H90O22",
+                MolecularWeight: "1079.3",
+                Charge: 0,
+                CovalentUnitCount: 1,
+                DefinedAtomStereoCount: 29,
+                UndefinedAtomStereoCount: 0,
+                InChIKey: "NODILNFGTFIURN-USYOXQFSSA-N",
+              },
+            ],
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    },
+  });
+
+  assert.equal(attempts, 2);
+  assert.equal(resolution.status, "resolved");
+  assert.equal(resolution.selected.cid, 12912363);
+  assert.equal(resolution.selected.title, "Ginsenoside Rb3");
 });

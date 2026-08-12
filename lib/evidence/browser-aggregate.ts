@@ -1,5 +1,9 @@
 import { aggregateCompoundEvidence, inferEvidenceLevel } from "./aggregate";
-import { resolveChineseCompoundName } from "./chinese-compounds";
+import {
+  findChineseCompoundByCid,
+  resolveChineseCompoundName,
+} from "./chinese-compounds";
+import { chineseRegistryCandidate } from "./compound-api";
 import {
   readBrowserCache,
   removeBrowserCache,
@@ -28,6 +32,7 @@ export const BROWSER_EVIDENCE_CACHE_TTL_MS = 6 * 60 * 60 * 1_000;
 // Large Europe PMC result sets can take longer on cross-border connections.
 // Keep the static fallback patient enough to return literature/effect records.
 const DEFAULT_BROWSER_AGGREGATION_TIMEOUT_MS = 30_000;
+const DEFAULT_BROWSER_RESOLUTION_TIMEOUT_MS = 20_000;
 
 const DEFAULT_LIMITS = {
   pubchemPatents: 100,
@@ -549,9 +554,12 @@ export async function resolveBrowserCompound(
     };
   }
   const pubChemQuery = chineseName ? String(chineseName.cid) : query;
+  const localFallbackEntry = chineseName ?? (
+    queryKind === "cid" ? findChineseCompoundByCid(Number(query)) : undefined
+  );
 
   const resolution = await resolvePubChemCompound(pubChemQuery, {
-    timeoutMs: options.timeoutMs ?? 12_000,
+    timeoutMs: options.timeoutMs ?? DEFAULT_BROWSER_RESOLUTION_TIMEOUT_MS,
     maxRecords: options.maxCandidates ?? 12,
     fetchImpl: createBrowserFetchImpl(
       withCallerSignal(options.fetchImpl ?? globalThis.fetch, options.signal),
@@ -574,6 +582,18 @@ export async function resolveBrowserCompound(
     entityNote: buildPubChemEntityNote(candidate),
   }));
   if (resolution.source.status === "error") {
+    if (localFallbackEntry) {
+      const fallback = chineseRegistryCandidate(localFallbackEntry);
+      return {
+        query,
+        queryKind,
+        status: "resolved",
+        candidates: [{ cid: fallback.cid, title: fallback.title }],
+        message: chineseName
+          ? `已按本地审核词表将${query}关联为${chineseName.englishName}（CID ${chineseName.cid}）。PubChem 身份详情暂未返回，可先确认该 CID 并继续检索；分子式和结构信息将在上游恢复后补充。`
+          : `CID ${fallback.cid} 已在本地审核词表中登记。PubChem 身份详情暂未返回，系统将继续使用该固定 CID 检索。`,
+      };
+    }
     return {
       query,
       queryKind,
@@ -658,13 +678,18 @@ export async function aggregateBrowserCompoundEvidence(
       maxRecords: 1,
       fetchImpl,
     });
-    if (identity.status !== "resolved" || !identity.selected) {
+    const localEntry = findChineseCompoundByCid(cid);
+    const compound = identity.status === "resolved" && identity.selected
+      ? identity.selected
+      : identity.source.status === "error" && localEntry
+        ? chineseRegistryCandidate(localEntry)
+        : undefined;
+    if (!compound) {
       throw new BrowserEvidenceError(
         `PubChem CID ${cid} 未返回可用的化学实体`,
         "compound_not_found",
       );
     }
-    const compound = identity.selected;
     const fallback: CompoundProfile = {
       ...compound,
       synonyms: [],

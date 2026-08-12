@@ -13,6 +13,11 @@ async function importSearchRoute() {
     ["storage", `export const consumeRateLimit = async () => null;`],
     ["compound-api", `
       export const COMPOUND_SEARCH_RATE_BUCKET = "test";
+      export const chineseRegistryCandidate = (entry) => ({
+        cid: entry.cid,
+        title: entry.englishName,
+        pubchemUrl: "https://pubchem.ncbi.nlm.nih.gov/compound/" + entry.cid,
+      });
       export const requiresStructureConfirmation = (kind) => kind === "name";
       export const toSearchCandidate = (compound) => compound;
     `],
@@ -20,6 +25,14 @@ async function importSearchRoute() {
       export async function resolvePubChemCompound(query) {
         globalThis.__chineseSearchPubChemQuery = query;
         const queryKind = /^\\d+$/.test(query) ? "cid" : "name";
+        if (globalThis.__chineseSearchPubChemUnavailable) {
+          return {
+            status: "not_found",
+            queryKind,
+            candidates: [],
+            source: { status: "error", totalAvailable: 0, truncated: false },
+          };
+        }
         const compound = {
           cid: queryKind === "cid" ? Number(query) : 969516,
           title: queryKind === "cid" ? "CID compound" : query,
@@ -100,6 +113,28 @@ test("exact identifiers remain eligible for automatic resolution", async () => {
   assert.equal(payload.compound.cid, 2244);
   assert.equal(payload.interpretedQuery, "2244");
   assert.equal("matchedChineseName" in payload, false);
+});
+
+test("search API keeps an exact Chinese CID usable during a PubChem outage", async () => {
+  globalThis.__chineseSearchPubChemUnavailable = true;
+  try {
+    const route = await importSearchRoute();
+    const response = await route.POST(new Request("https://example.test/api/search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: "人参皂苷 rb3" }),
+    }));
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(globalThis.__chineseSearchPubChemQuery, "12912363");
+    assert.equal(payload.status, "ambiguous");
+    assert.equal(payload.queryKind, "name");
+    assert.equal(payload.candidates[0].cid, 12912363);
+    assert.match(payload.warning, /本地审核词表/);
+  } finally {
+    delete globalThis.__chineseSearchPubChemUnavailable;
+  }
 });
 
 test("SearchForm submits the user's term and uses the shared Chinese suggestion index", async () => {

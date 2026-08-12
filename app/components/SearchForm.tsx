@@ -56,6 +56,7 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
         candidates?: Candidate[];
         interpretedQuery?: string;
         matchedChineseName?: string;
+        warning?: string;
       };
       if (!response.ok) {
         const responseMessage = data.error || "未找到匹配化合物，请检查已收录中文名、英文名、CAS、CID 或 InChIKey";
@@ -70,7 +71,8 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
         const interpretation = data.matchedChineseName && data.interpretedQuery
           ? `已将“${clean}”关联为 ${data.interpretedQuery}。`
           : "";
-        setMessage(interpretation + (data.candidates.length === 1
+        const degradedNotice = data.warning ? `${data.warning} ` : "";
+        setMessage(interpretation + degradedNotice + (data.candidates.length === 1
           ? "PubChem 返回以下化学实体，请核对结构、分子式和 InChIKey 后确认。"
           : `PubChem 返回 ${data.candidates.length} 个可能的化学实体，请根据结构、分子式和 InChIKey 选择。`));
       } else {

@@ -65,6 +65,14 @@ test("exact Chinese names resolve to PubChem-ready English names", () => {
     registry.resolveChineseCompoundName("维生素 C")?.cid,
     54670067,
   );
+  assert.equal(
+    registry.resolveChineseCompoundName("人参皂苷 rb3")?.cid,
+    12912363,
+  );
+  assert.equal(
+    registry.findChineseCompoundByCid(12912363)?.labelZh,
+    "人参皂苷 Rb3",
+  );
 });
 
 test("all CSV names resolve to their reviewed English name and PubChem CID", async () => {

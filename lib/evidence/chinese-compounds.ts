@@ -621,8 +621,10 @@ const INDEXED_ENTRIES: IndexedChineseCompound[] = CHINESE_COMPOUND_ENTRIES.map(
 );
 
 const EXACT_ENTRY_INDEX = new Map<string, ChineseCompoundEntry>();
+const CID_ENTRY_INDEX = new Map<number, ChineseCompoundEntry>();
 
 for (const indexed of INDEXED_ENTRIES) {
+  CID_ENTRY_INDEX.set(indexed.entry.cid, indexed.entry);
   for (const term of indexed.terms) {
     const existing = EXACT_ENTRY_INDEX.get(term);
     if (existing && existing.cid !== indexed.entry.cid) {
@@ -644,6 +646,17 @@ export function resolveChineseCompoundName(
   const normalized = normalizeChineseCompoundTerm(input);
   if (!normalized) return undefined;
   return EXACT_ENTRY_INDEX.get(normalized);
+}
+
+/**
+ * Return the reviewed local identity for one PubChem CID. The registry rejects
+ * CID collisions during construction, so this reverse lookup is deterministic
+ * and can be used as a degraded identity when PubChem is temporarily busy.
+ */
+export function findChineseCompoundByCid(
+  cid: number,
+): ChineseCompoundEntry | undefined {
+  return CID_ENTRY_INDEX.get(cid);
 }
 
 /**

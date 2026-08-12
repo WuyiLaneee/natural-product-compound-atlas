@@ -1,10 +1,14 @@
 import { isDatabaseUnavailableError } from "@/db";
 import {
   COMPOUND_SEARCH_RATE_BUCKET,
+  chineseRegistryCandidate,
   requiresStructureConfirmation,
   toSearchCandidate,
 } from "@/lib/evidence/compound-api";
-import { resolveChineseCompoundName } from "@/lib/evidence/chinese-compounds";
+import {
+  findChineseCompoundByCid,
+  resolveChineseCompoundName,
+} from "@/lib/evidence/chinese-compounds";
 import { resolvePubChemCompound } from "@/lib/evidence/sources/pubchem";
 import { consumeRateLimit } from "@/lib/storage";
 
@@ -59,13 +63,41 @@ export async function POST(request: Request) {
   };
 
   const resolution = await resolvePubChemCompound(pubChemQuery, {
-    timeoutMs: 12_000,
+    timeoutMs: 20_000,
     maxRecords: 12,
   });
   const effectiveQueryKind = chineseMatch ? "name" : resolution.queryKind;
   const candidates = resolution.candidates.map(toSearchCandidate);
 
   if (resolution.source.status === "error") {
+    const localFallback = chineseMatch ?? (
+      effectiveQueryKind === "cid"
+        ? findChineseCompoundByCid(Number(pubChemQuery))
+        : undefined
+    );
+    if (localFallback) {
+      const fallbackCandidate = toSearchCandidate(
+        chineseRegistryCandidate(localFallback),
+      );
+      if (effectiveQueryKind !== "name") {
+        return Response.json({
+          status: "resolved",
+          queryKind: effectiveQueryKind,
+          compound: fallbackCandidate,
+          warning: "PubChem 身份详情暂未返回，当前使用本地审核词表中的固定 CID。",
+          ...queryInterpretation,
+        });
+      }
+      return Response.json({
+        status: "ambiguous",
+        queryKind: "name",
+        candidates: [fallbackCandidate],
+        totalAvailable: 1,
+        truncated: false,
+        warning: "PubChem 身份详情暂未返回，当前显示本地审核词表中的固定 CID。",
+        ...queryInterpretation,
+      });
+    }
     return Response.json({
       status: "unavailable",
       error: "PubChem 化合物解析服务暂时不可用，请稍后重试。",

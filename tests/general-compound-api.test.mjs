@@ -123,6 +123,20 @@ test("search candidates retain PubChem identity and a CID-scoped structure image
   assert.match(candidate.structureUrl, /\/cid\/5234\/PNG/);
 });
 
+test("reviewed Chinese registry identities can provide a CID-scoped degraded candidate", () => {
+  const candidate = compoundApi.chineseRegistryCandidate({
+    labelZh: "人参皂苷 Rb3",
+    englishName: "GINSENOSIDE RB3",
+    cid: 12912363,
+    source: "cosmetic-small-molecules-pubchem-csv",
+  });
+  assert.deepEqual(candidate, {
+    cid: 12912363,
+    title: "GINSENOSIDE RB3",
+    pubchemUrl: "https://pubchem.ncbi.nlm.nih.gov/compound/12912363",
+  });
+});
+
 test("literature aliases are deterministic from the PubChem CID profile", () => {
   const profile = {
     cid: 969516,

@@ -285,6 +285,30 @@ test("browser resolver maps an exact Chinese compound name before querying PubCh
   assert.equal(calls.length, 1);
 });
 
+test("browser resolver falls back to the reviewed Rb3 CID when PubChem is busy", async () => {
+  let calls = 0;
+  const resolution = await browserAggregate.resolveBrowserCompound(
+    "人参皂苷 rb3",
+    {
+      fetchImpl: async (input) => {
+        calls += 1;
+        assert.match(String(input), /\/compound\/cid\/12912363\/property\//);
+        return new Response("PUGREST.ServerBusy", { status: 503 });
+      },
+    },
+  );
+
+  assert.equal(calls, 2);
+  assert.equal(resolution.queryKind, "name");
+  assert.equal(resolution.status, "resolved");
+  assert.deepEqual(resolution.candidates, [
+    { cid: 12912363, title: "GINSENOSIDE RB3" },
+  ]);
+  assert.match(resolution.message, /本地审核词表/);
+  assert.match(resolution.message, /CID 12912363/);
+  assert.match(resolution.message, /可先确认该 CID 并继续检索/);
+});
+
 test("browser resolver explains when a Chinese compound name is not curated", async () => {
   let fetchCalls = 0;
   const resolution = await browserAggregate.resolveBrowserCompound("尚未收录的测试分子", {

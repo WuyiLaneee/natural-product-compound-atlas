@@ -4,9 +4,11 @@ import {
   COMPOUND_EVIDENCE_CACHE_SOURCE,
   COMPOUND_EVIDENCE_CACHE_TTL_MS,
   COMPOUND_REFRESH_RATE_BUCKET,
+  chineseRegistryCandidate,
   compoundEvidenceCacheId,
   parsePubChemCid,
 } from "@/lib/evidence/compound-api";
+import { findChineseCompoundByCid } from "@/lib/evidence/chinese-compounds";
 import {
   buildPubChemEntityNote,
   resolvePubChemCompound,
@@ -301,10 +303,16 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
   // parameter is deliberately never read, so a display query cannot alter
   // evidence retrieval or poison another compound's cached payload.
   const resolution = await resolvePubChemCompound(String(cid), {
-    timeoutMs: 12_000,
+    timeoutMs: 20_000,
     maxRecords: 1,
   });
-  if (resolution.source.status === "error") {
+  const localEntry = findChineseCompoundByCid(cid);
+  const compound = resolution.status === "resolved" && resolution.selected
+    ? resolution.selected
+    : resolution.source.status === "error" && localEntry
+      ? chineseRegistryCandidate(localEntry)
+      : undefined;
+  if (!compound && resolution.source.status === "error") {
     return Response.json(
       {
         status: "unavailable",
@@ -313,11 +321,9 @@ export async function GET(request: Request, context: { params: Promise<{ cid: st
       { status: 502 },
     );
   }
-  if (resolution.status !== "resolved" || !resolution.selected) {
+  if (!compound) {
     return Response.json({ error: `PubChem CID ${cid} 不存在或未返回化合物记录。` }, { status: 404 });
   }
-
-  const compound = resolution.selected;
   const epo = hasText(process.env.EPO_CLIENT_ID) && hasText(process.env.EPO_CLIENT_SECRET)
     ? { clientId: process.env.EPO_CLIENT_ID, clientSecret: process.env.EPO_CLIENT_SECRET }
     : undefined;

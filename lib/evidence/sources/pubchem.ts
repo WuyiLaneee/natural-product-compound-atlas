@@ -33,6 +33,44 @@ const PROPERTY_LIST = [
   "InChIKey",
 ].join(",");
 
+// Compound resolution is the latency-sensitive step that runs before the user
+// can confirm a structure. Large records (for example ginsenosides) can make
+// PubChem's full IUPAC/InChI response exceed the browser search timeout even
+// though the same CID is healthy. Load only the fields required to identify
+// and safely distinguish the entity here; the profile request enriches the
+// selected compound with the full property set afterwards.
+const RESOLUTION_PROPERTY_LIST = [
+  "Title",
+  "MolecularFormula",
+  "MolecularWeight",
+  "Charge",
+  "CovalentUnitCount",
+  "DefinedAtomStereoCount",
+  "UndefinedAtomStereoCount",
+  "InChIKey",
+].join(",");
+
+const PUBCHEM_TRANSIENT_RETRY_DELAY_MS = 1_000;
+
+async function fetchPubChemJson<T>(
+  url: string,
+  timeoutMs: number | undefined,
+  fetchImpl: typeof fetch | undefined,
+): Promise<T> {
+  try {
+    return await fetchJson<T>(url, {}, timeoutMs, fetchImpl);
+  } catch (error) {
+    const retryableTransient =
+      error instanceof SourceFetchError && error.retryable;
+    if (!retryableTransient) throw error;
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, PUBCHEM_TRANSIENT_RETRY_DELAY_MS),
+    );
+    return fetchJson<T>(url, {}, timeoutMs, fetchImpl);
+  }
+}
+
 export interface PubChemProfileOptions extends SourceRequestOptions {
   maxSynonyms?: number;
   maxPatentReferences?: number;
@@ -200,9 +238,8 @@ export async function resolvePubChemCompound(
     } else {
       const namespace = queryKind === "inchikey" ? "inchikey" : "name";
       const cidUrl = `${PUBCHEM_PUG}/compound/${namespace}/${encodeURIComponent(query)}/cids/JSON`;
-      const cidResponse = await fetchJson<PubChemCidResponse>(
+      const cidResponse = await fetchPubChemJson<PubChemCidResponse>(
         cidUrl,
-        {},
         timeoutMs,
         fetchImpl,
       );
@@ -214,10 +251,9 @@ export async function resolvePubChemCompound(
     if (cids.length === 0) return notFoundResolution(query, queryKind);
 
     const selectedCids = cids.slice(0, maxCandidates);
-    const propertyUrl = `${PUBCHEM_PUG}/compound/cid/${selectedCids.join(",")}/property/${PROPERTY_LIST}/JSON`;
-    const propertyResponse = await fetchJson<PubChemPropertyResponse>(
+    const propertyUrl = `${PUBCHEM_PUG}/compound/cid/${selectedCids.join(",")}/property/${RESOLUTION_PROPERTY_LIST}/JSON`;
+    const propertyResponse = await fetchPubChemJson<PubChemPropertyResponse>(
       propertyUrl,
-      {},
       timeoutMs,
       fetchImpl,
     );

@@ -1,4 +1,5 @@
 import type { CompoundCandidate, CompoundQueryKind } from "./types";
+import type { ChineseCompoundEntry } from "./chinese-compounds";
 import { buildPubChemEntityNote } from "./sources/pubchem";
 
 /**
@@ -24,6 +25,16 @@ export function compoundEvidenceCacheId(cid: number): string {
 
 export function requiresStructureConfirmation(queryKind: CompoundQueryKind): boolean {
   return queryKind === "name";
+}
+
+export function chineseRegistryCandidate(
+  entry: ChineseCompoundEntry,
+): CompoundCandidate {
+  return {
+    cid: entry.cid,
+    title: entry.englishName,
+    pubchemUrl: `https://pubchem.ncbi.nlm.nih.gov/compound/${entry.cid}`,
+  };
 }
 
 export function toSearchCandidate(candidate: CompoundCandidate) {
