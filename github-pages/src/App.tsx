@@ -217,7 +217,7 @@ function CompoundPage({ cid, query }: { cid: number; query: string }) {
 }
 
 function LoadingState() {
-  return <section className="result-loading" aria-live="polite"><div className="loading-orbit" /><p className="eyebrow dark"><span /> LIVE RESEARCH DATA</p><h1>正在汇聚公开科研数据</h1><p>正在连接 PubChem、ChEMBL、PubMed / Europe PMC 与 ClinicalTrials.gov</p><div className="loading-sources"><span>化合物身份</span><span>功效论文</span><span>靶点活性</span><span>临床研究</span></div></section>;
+  return <section className="result-loading" aria-live="polite"><div className="loading-orbit" /><p className="eyebrow dark"><span /> LIVE RESEARCH DATA</p><h1>正在链接巨子生物AI数据库</h1><p>正在连接 PubChem、ChEMBL、PubMed / Europe PMC 与 ClinicalTrials.gov</p><div className="loading-sources"><span>化合物身份</span><span>功效论文</span><span>靶点活性</span><span>临床研究</span></div></section>;
 }
 
 function ErrorState({ message, retry }: { message: string; retry: () => void }) {
