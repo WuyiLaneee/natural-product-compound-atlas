@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { resolveChineseCompoundName } from "@/lib/evidence/chinese-compounds";
 
 type SourceState = { source: string; status: "success" | "partial" | "skipped" | "error"; count?: number; message?: string; fetchedAt?: string };
 type Compound = {
@@ -85,6 +86,8 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
   if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在汇聚化合物与科研数据</strong><p>PubChem · ChEMBL · PubMed / Europe PMC · ClinicalTrials · Patents</p></div></div>;
 
   const { compound } = payload;
+  const matchedChineseEntry = query ? resolveChineseCompoundName(query) : undefined;
+  const confirmedChineseEntry = matchedChineseEntry?.cid === compound.cid ? matchedChineseEntry : undefined;
   return (
     <>
       <section className="identity-panel">
@@ -94,6 +97,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
         <div className="identity-copy">
           <div className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</div>
           <h1>{compound.title}</h1>
+          {confirmedChineseEntry && <p className="chinese-identity-line"><span>中文名称</span><strong>{confirmedChineseEntry.labelZh}</strong><small>CSV 精确关联 CID {confirmedChineseEntry.cid}</small></p>}
           <div className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || query || "相关名称整理中"}</div>
           {compound.iupacName && <p className="iupac-line"><span>IUPAC</span>{compound.iupacName}</p>}
           <div className="identity-facts">
@@ -130,6 +134,9 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
               <div className="metric-card"><span>学术论文</span><strong>{payload.literature.length}</strong><small>汇总 DOI / PMID</small></div>
               <div className="metric-card"><span>专利信息</span><strong>{payload.patents.length}</strong><small>按专利族整理</small></div>
             </div>
+            <RecordSection title="相关功效摘要" note="确认 PubChem CID 后，从 PubMed / Europe PMC 题录与摘要中筛选">
+              <ClaimsList records={effectClaims.slice(0, 6)} empty="当前公开文献中尚未筛选出可结构化展示的功效条目。" />
+            </RecordSection>
             <RecordSection title="代表性研究" note="优先展示与当前化合物高度相关的论文记录">
               <LiteratureList records={payload.literature.slice(0, 5)} />
             </RecordSection>

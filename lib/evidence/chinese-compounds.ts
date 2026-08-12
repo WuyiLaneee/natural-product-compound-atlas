@@ -1,16 +1,29 @@
+import { GENERATED_CHINESE_COMPOUND_ENTRIES } from "./chinese-compounds.generated";
+
+export type ChineseCompoundSource =
+  | "cosmetic-small-molecules-pubchem-csv"
+  | "curated-extension";
+
 export type ChineseCompoundEntry = {
   labelZh: string;
   englishName: string;
+  cid: number;
+  source: ChineseCompoundSource;
   aliases?: string[];
   category?: string;
 };
+
+export type CuratedCompoundDefinition = Omit<
+  ChineseCompoundEntry,
+  "cid" | "source"
+>;
 
 /**
  * Curated Chinese names that can be translated into an unambiguous PubChem
  * query. Broad families (for example, "黄酮" or "人参皂苷") are deliberately
  * excluded because they do not identify one chemical entity.
  */
-export const CHINESE_COMPOUND_ENTRIES: readonly ChineseCompoundEntry[] = [
+const CURATED_COMPOUND_DEFINITIONS: readonly CuratedCompoundDefinition[] = [
   {
     labelZh: "姜黄素",
     englishName: "Curcumin",
@@ -397,6 +410,185 @@ export const CHINESE_COMPOUND_ENTRIES: readonly ChineseCompoundEntry[] = [
   },
 ];
 
+const CURATED_EXTENSION_CIDS = new Map<string, number>([
+  ["luteolin", 5280445],
+  ["apigenin", 5280443],
+  ["fisetin", 5281614],
+  ["naringenin", 439246],
+  ["epicatechin", 72276],
+  ["chlorogenic acid", 1794427],
+  ["rosmarinic acid", 5281792],
+  ["genistein", 5280961],
+  ["daidzein", 5281708],
+  ["puerarin", 5281807],
+  ["pterostilbene", 5281727],
+  ["hydroxytyrosol", 82755],
+  ["urolithin a", 5488186],
+  ["paclitaxel", 36314],
+  ["betulinic acid", 64971],
+  ["astragaloside iv", 13943297],
+  ["paeoniflorin", 442534],
+  ["salidroside", 159278],
+  ["gastrodin", 115067],
+  ["baicalin", 64982],
+  ["scutellarin", 185617],
+  ["berberine", 2353],
+  ["trigonelline", 5570],
+  ["oxymatrine", 24864132],
+  ["camptothecin", 24360],
+  ["colchicine", 6167],
+  ["coenzyme q10", 5281915],
+  ["lipoic acid", 6112],
+  ["glutathione", 124886],
+  ["beta-nicotinamide mononucleotide", 14180],
+  ["carnosine", 439224],
+  ["beta-arbutin", 440936],
+  ["tranexamic acid", 5526],
+  ["tretinoin", 444795],
+  ["alpha-tocopherol", 14985],
+]);
+
+function normalizeRegistryIdentifier(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase("zh-CN");
+}
+
+function claimRegistryKey(
+  index: Map<string, number>,
+  key: string,
+  entryIndex: number,
+  description: string,
+): void {
+  const existingIndex = index.get(key);
+  if (existingIndex !== undefined && existingIndex !== entryIndex) {
+    throw new Error(
+      `Conflicting Chinese compound registry ${description}: "${key}" maps to entries ${existingIndex} and ${entryIndex}.`,
+    );
+  }
+  index.set(key, entryIndex);
+}
+
+/**
+ * Merge the CSV-backed registry with the prior curated aliases. Matching may
+ * use Chinese name, English name, or an explicitly reviewed PubChem CID.
+ * Multiple matches are a data conflict and stop the build instead of silently
+ * selecting one chemical entity.
+ */
+export function buildChineseCompoundRegistry(
+  generatedEntries: readonly ChineseCompoundEntry[],
+  curatedDefinitions: readonly CuratedCompoundDefinition[] = [],
+): ChineseCompoundEntry[] {
+  const entries: ChineseCompoundEntry[] = generatedEntries.map((entry) => ({
+    ...entry,
+    aliases: entry.aliases ? [...entry.aliases] : undefined,
+  }));
+  const chineseIndex = new Map<string, number>();
+  const englishIndex = new Map<string, number>();
+  const cidIndex = new Map<string, number>();
+
+  const indexEntry = (entry: ChineseCompoundEntry, entryIndex: number): void => {
+    claimRegistryKey(
+      chineseIndex,
+      normalizeChineseCompoundTerm(entry.labelZh),
+      entryIndex,
+      "Chinese name",
+    );
+    for (const alias of entry.aliases ?? []) {
+      claimRegistryKey(
+        chineseIndex,
+        normalizeChineseCompoundTerm(alias),
+        entryIndex,
+        "Chinese alias",
+      );
+    }
+    claimRegistryKey(
+      englishIndex,
+      normalizeRegistryIdentifier(entry.englishName),
+      entryIndex,
+      "English name",
+    );
+    claimRegistryKey(cidIndex, String(entry.cid), entryIndex, "PubChem CID");
+  };
+
+  entries.forEach(indexEntry);
+
+  for (const definition of curatedDefinitions) {
+    const englishKey = normalizeRegistryIdentifier(definition.englishName);
+    const supplementalCid = CURATED_EXTENSION_CIDS.get(englishKey);
+    const candidateIndexes = new Set<number>();
+    const addCandidate = (candidate: number | undefined): void => {
+      if (candidate !== undefined) candidateIndexes.add(candidate);
+    };
+
+    addCandidate(
+      chineseIndex.get(normalizeChineseCompoundTerm(definition.labelZh)),
+    );
+    addCandidate(englishIndex.get(englishKey));
+    if (supplementalCid !== undefined) {
+      addCandidate(cidIndex.get(String(supplementalCid)));
+    }
+    for (const alias of definition.aliases ?? []) {
+      addCandidate(chineseIndex.get(normalizeChineseCompoundTerm(alias)));
+    }
+
+    if (candidateIndexes.size > 1) {
+      throw new Error(
+        `Conflicting curated mapping for "${definition.labelZh}" / "${definition.englishName}": matched entries ${[...candidateIndexes].join(", ")}.`,
+      );
+    }
+
+    const [matchedIndex] = candidateIndexes;
+    if (matchedIndex === undefined) {
+      if (supplementalCid === undefined) {
+        throw new Error(
+          `Curated entry "${definition.labelZh}" / "${definition.englishName}" is absent from the CSV and has no reviewed PubChem CID.`,
+        );
+      }
+      const newEntry: ChineseCompoundEntry = {
+        ...definition,
+        cid: supplementalCid,
+        source: "curated-extension",
+        aliases: definition.aliases ? [...definition.aliases] : undefined,
+      };
+      const newIndex = entries.push(newEntry) - 1;
+      indexEntry(newEntry, newIndex);
+      continue;
+    }
+
+    const current = entries[matchedIndex];
+    if (supplementalCid !== undefined && current.cid !== supplementalCid) {
+      throw new Error(
+        `Curated PubChem CID conflict for "${definition.labelZh}": CSV CID ${current.cid}, reviewed CID ${supplementalCid}.`,
+      );
+    }
+    const aliases = Array.from(
+      new Set([
+        definition.labelZh,
+        ...(current.aliases ?? []),
+        ...(definition.aliases ?? []),
+      ]),
+    ).filter(
+      (alias) =>
+        normalizeChineseCompoundTerm(alias) !==
+        normalizeChineseCompoundTerm(current.labelZh),
+    );
+    const mergedEntry: ChineseCompoundEntry = {
+      ...current,
+      category: definition.category ?? current.category,
+      aliases: aliases.length > 0 ? aliases : undefined,
+    };
+    entries[matchedIndex] = mergedEntry;
+    indexEntry(mergedEntry, matchedIndex);
+  }
+
+  return entries;
+}
+
+export const CHINESE_COMPOUND_ENTRIES: readonly ChineseCompoundEntry[] =
+  buildChineseCompoundRegistry(
+    GENERATED_CHINESE_COMPOUND_ENTRIES,
+    CURATED_COMPOUND_DEFINITIONS,
+  );
+
 function normalizeChineseCompoundTerm(value: string): string {
   return value
     .normalize("NFKC")
@@ -429,19 +621,16 @@ const INDEXED_ENTRIES: IndexedChineseCompound[] = CHINESE_COMPOUND_ENTRIES.map(
 );
 
 const EXACT_ENTRY_INDEX = new Map<string, ChineseCompoundEntry>();
-const AMBIGUOUS_EXACT_TERMS = new Set<string>();
 
 for (const indexed of INDEXED_ENTRIES) {
   for (const term of indexed.terms) {
     const existing = EXACT_ENTRY_INDEX.get(term);
-    if (existing && existing !== indexed.entry) {
-      EXACT_ENTRY_INDEX.delete(term);
-      AMBIGUOUS_EXACT_TERMS.add(term);
-      continue;
+    if (existing && existing.cid !== indexed.entry.cid) {
+      throw new Error(
+        `Conflicting Chinese compound exact term "${term}" maps to PubChem CIDs ${existing.cid} and ${indexed.entry.cid}.`,
+      );
     }
-    if (!AMBIGUOUS_EXACT_TERMS.has(term)) {
-      EXACT_ENTRY_INDEX.set(term, indexed.entry);
-    }
+    EXACT_ENTRY_INDEX.set(term, indexed.entry);
   }
 }
 
@@ -453,7 +642,7 @@ export function resolveChineseCompoundName(
   input: string,
 ): ChineseCompoundEntry | undefined {
   const normalized = normalizeChineseCompoundTerm(input);
-  if (!normalized || AMBIGUOUS_EXACT_TERMS.has(normalized)) return undefined;
+  if (!normalized) return undefined;
   return EXACT_ENTRY_INDEX.get(normalized);
 }
 

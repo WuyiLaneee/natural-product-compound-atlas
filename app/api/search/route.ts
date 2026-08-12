@@ -52,15 +52,17 @@ export async function POST(request: Request) {
 
   const chineseMatch = resolveChineseCompoundName(query);
   const interpretedQuery = chineseMatch?.englishName ?? query;
+  const pubChemQuery = chineseMatch ? String(chineseMatch.cid) : interpretedQuery;
   const queryInterpretation = {
     interpretedQuery,
     ...(chineseMatch ? { matchedChineseName: chineseMatch.labelZh } : {}),
   };
 
-  const resolution = await resolvePubChemCompound(interpretedQuery, {
+  const resolution = await resolvePubChemCompound(pubChemQuery, {
     timeoutMs: 12_000,
     maxRecords: 12,
   });
+  const effectiveQueryKind = chineseMatch ? "name" : resolution.queryKind;
   const candidates = resolution.candidates.map(toSearchCandidate);
 
   if (resolution.source.status === "error") {
@@ -83,10 +85,10 @@ export async function POST(request: Request) {
   // even when PubChem currently returns only one CID. Require an explicit
   // structure confirmation for these semantic lookups. A unique CID or full
   // InChIKey is already an exact identity and can continue automatically.
-  if (resolution.status === "ambiguous" || requiresStructureConfirmation(resolution.queryKind)) {
+  if (resolution.status === "ambiguous" || requiresStructureConfirmation(effectiveQueryKind)) {
     return Response.json({
       status: "ambiguous",
-      queryKind: resolution.queryKind,
+      queryKind: effectiveQueryKind,
       candidates,
       totalAvailable: resolution.source.totalAvailable ?? candidates.length,
       truncated: resolution.source.truncated,
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
 
   return Response.json({
     status: "resolved",
-    queryKind: resolution.queryKind,
+    queryKind: effectiveQueryKind,
     compound: toSearchCandidate(resolution.selected ?? resolution.candidates[0]),
     ...queryInterpretation,
   });

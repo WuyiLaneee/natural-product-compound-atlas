@@ -7,10 +7,13 @@
   },
   "scripts": {
     "dev": "vinext dev",
+    "prebuild": "npm run generate:chinese-compounds",
     "build": "vinext build",
+    "prebuild:pages": "npm run generate:chinese-compounds",
     "build:pages": "vite build --config github-pages/vite.config.ts",
     "start": "vinext start",
     "test": "npm run build && node --test tests/*.test.mjs",
+    "generate:chinese-compounds": "node scripts/generate-chinese-compound-data.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:pages": "tsc -p github-pages/tsconfig.json --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern dist-pages --ignore-pattern .next",

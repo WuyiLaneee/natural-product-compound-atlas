@@ -257,9 +257,6 @@ test("browser resolver maps an exact Chinese compound name before querying PubCh
   const fakeFetch = async (input) => {
     const url = String(input);
     calls.push(url);
-    if (url.includes("/compound/name/Quercetin/cids/JSON")) {
-      return Response.json({ IdentifierList: { CID: [5280343] } });
-    }
     if (url.includes("/compound/cid/5280343/property/")) {
       return Response.json({
         PropertyTable: {
@@ -283,8 +280,9 @@ test("browser resolver maps an exact Chinese compound name before querying PubCh
   assert.equal(resolution.queryKind, "name");
   assert.equal(resolution.status, "resolved");
   assert.deepEqual(resolution.candidates.map((item) => item.cid), [5280343]);
-  assert.match(resolution.message, /已将槲皮素关联为Quercetin，请确认结构/);
-  assert.equal(calls.length, 2);
+  assert.match(resolution.message, /按 CSV 将槲皮素关联为QUERCETIN（CID 5280343）/);
+  assert.match(resolution.message, /确认后可查看相关功效、靶点与文献/);
+  assert.equal(calls.length, 1);
 });
 
 test("browser resolver explains when a Chinese compound name is not curated", async () => {

@@ -11,4 +11,5 @@ export {
 export {
   CHINESE_COMPOUND_ENTRIES,
   findChineseCompoundSuggestions,
+  resolveChineseCompoundName,
 } from "../../../lib/evidence/chinese-compounds";

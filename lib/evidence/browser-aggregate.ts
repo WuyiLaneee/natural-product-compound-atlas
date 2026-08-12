@@ -548,7 +548,7 @@ export async function resolveBrowserCompound(
       message: `当前中文词库暂未收录“${query}”。请尝试输入准确的中文单体名称，或改用英文名、CAS号、PubChem CID 或完整 InChIKey。`,
     };
   }
-  const pubChemQuery = chineseName?.englishName ?? query;
+  const pubChemQuery = chineseName ? String(chineseName.cid) : query;
 
   const resolution = await resolvePubChemCompound(pubChemQuery, {
     timeoutMs: options.timeoutMs ?? 12_000,
@@ -589,7 +589,7 @@ export async function resolveBrowserCompound(
       status: "not_found",
       candidates: [],
       message: chineseName
-        ? `已将${query}关联为${chineseName.englishName}，但 PubChem 未找到匹配的化学实体。`
+        ? `已按 CSV 将${query}关联为${chineseName.englishName}（CID ${chineseName.cid}），但 PubChem 未找到匹配的化学实体。`
         : "PubChem 未找到匹配的化学实体，请核对名称、CAS号或结构标识符。",
     };
   }
@@ -609,8 +609,8 @@ export async function resolveBrowserCompound(
     candidates,
     message: chineseName
       ? candidates.length > 1
-        ? `已将${query}关联为${chineseName.englishName}；PubChem 返回 ${candidates.length} 个候选结构，请确认结构、分子式和 InChIKey。`
-        : `已将${query}关联为${chineseName.englishName}，请确认结构、分子式和 InChIKey。`
+        ? `已按 CSV 将${query}关联为${chineseName.englishName}（CID ${chineseName.cid}）；PubChem 返回 ${candidates.length} 个候选结构，请确认结构、分子式和 InChIKey。`
+        : `已按 CSV 将${query}关联为${chineseName.englishName}（CID ${chineseName.cid}），请确认结构、分子式和 InChIKey；确认后可查看相关功效、靶点与文献。`
       : candidates.length > 1
         ? `PubChem 返回 ${candidates.length} 个候选结构，请根据分子式和 InChIKey 选择。`
         : undefined,

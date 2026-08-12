@@ -69,7 +69,7 @@ async function importSearchRoute() {
   );
 }
 
-test("search API translates an exact curated Chinese name before PubChem and still requires structure confirmation", async () => {
+test("search API resolves an exact CSV Chinese name by CID and still requires structure confirmation", async () => {
   const route = await importSearchRoute();
   const response = await route.POST(new Request("https://example.test/api/search", {
     method: "POST",
@@ -78,10 +78,10 @@ test("search API translates an exact curated Chinese name before PubChem and sti
   }));
   const payload = await response.json();
 
-  assert.equal(globalThis.__chineseSearchPubChemQuery, "Curcumin");
+  assert.equal(globalThis.__chineseSearchPubChemQuery, "969516");
   assert.equal(payload.status, "ambiguous");
   assert.equal(payload.queryKind, "name");
-  assert.equal(payload.interpretedQuery, "Curcumin");
+  assert.equal(payload.interpretedQuery, "CURCUMIN");
   assert.equal(payload.matchedChineseName, "姜黄素");
   assert.equal(payload.candidates[0].cid, 969516);
 });
@@ -113,4 +113,17 @@ test("SearchForm submits the user's term and uses the shared Chinese suggestion 
   assert.doesNotMatch(source, /apiQuery/);
   assert.match(source, /中文快捷入口/);
   assert.doesNotMatch(source, /已收录.*常见化合物中文名称及常用别名/);
+});
+
+test("both result UIs expose CID-confirmed PubMed effect summaries for Chinese searches", async () => {
+  const [pagesSource, sitesSource] = await Promise.all([
+    readFile(new URL("../github-pages/src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/CompoundExplorer.tsx", import.meta.url), "utf8"),
+  ]);
+
+  for (const source of [pagesSource, sitesSource]) {
+    assert.match(source, /CSV 精确关联 CID/);
+    assert.match(source, /相关功效摘要/);
+    assert.match(source, /PubMed \/ Europe PMC 题录与摘要中筛选/);
+  }
 });

@@ -3,6 +3,7 @@ import {
   aggregateBrowserCompoundEvidence,
   findChineseCompoundSuggestions,
   resolveBrowserCompound,
+  resolveChineseCompoundName,
   type BrowserCompoundPayload,
   type BrowserCompoundCandidate,
 } from "./data/browserAggregator";
@@ -211,7 +212,7 @@ function CompoundPage({ cid, query }: { cid: number; query: string }) {
   };
 
   return <main className="result-page"><Header compact /><section className="result-top"><SearchModule compact initialValue={query} /></section><div className="result-shell">
-    {error ? <ErrorState message={error} retry={retry} /> : !payload ? <LoadingState /> : <CompoundResult payload={payload} tab={tab} setTab={setTab} />}
+    {error ? <ErrorState message={error} retry={retry} /> : !payload ? <LoadingState /> : <CompoundResult payload={payload} query={query} tab={tab} setTab={setTab} />}
   </div><Footer /></main>;
 }
 
@@ -223,22 +224,24 @@ function ErrorState({ message, retry }: { message: string; retry: () => void }) 
   return <section className="result-error" role="alert"><span className="error-mark">!</span><div><p className="eyebrow dark"><span /> CONNECTION STATUS</p><h1>暂时无法完成本次检索</h1><p>{message}</p><p>公开数据库可能暂时不可达，已获取的信息不会受影响，请稍后重试。</p><div className="error-actions"><button onClick={retry}>重新检索</button><a href="#/">返回检索首页</a></div></div></section>;
 }
 
-function CompoundResult({ payload, tab, setTab }: { payload: BrowserCompoundPayload; tab: Tab; setTab: (tab: Tab) => void }) {
+function CompoundResult({ payload, query, tab, setTab }: { payload: BrowserCompoundPayload; query: string; tab: Tab; setTab: (tab: Tab) => void }) {
   const { compound } = payload;
   const effects = payload.claims.filter((x) => x.kind === "effect");
   const targets = payload.claims.filter((x) => x.kind === "target" || x.kind === "mechanism");
   const uniqueTargets = new Set(payload.bioactivities.map((x) => x.targetName).filter(Boolean)).size;
+  const matchedChineseEntry = resolveChineseCompoundName(query);
+  const confirmedChineseEntry = matchedChineseEntry?.cid === compound.cid ? matchedChineseEntry : undefined;
   return <>
     <a href="#/" className="back-link">← 返回检索首页</a>
     <section className="identity-panel">
       <div className="structure-box"><img src={compound.structureUrl || `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${compound.cid}/PNG?record_type=2d`} alt={`${compound.title} 二维结构`} /></div>
-      <div className="identity-copy"><p className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</p><h1>{compound.title}</h1><p className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || "相关名称整理中"}</p>{compound.iupacName && <p className="iupac-line"><span>IUPAC</span>{compound.iupacName}</p>}<div className="identity-facts"><div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div><div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div><div><span>净电荷</span><strong>{compound.charge ?? "—"}</strong></div><div><span>共价单元</span><strong>{compound.covalentUnitCount ?? "—"}</strong></div><div><span>InChIKey</span><code>{compound.inchiKey || "—"}</code></div><div><span>原子立体中心</span><strong>{compound.definedAtomStereoCount !== undefined || compound.undefinedAtomStereoCount !== undefined ? `${compound.definedAtomStereoCount ?? 0} 已定义 · ${compound.undefinedAtomStereoCount ?? 0} 未定义` : "—"}</strong></div><div><span>Isomeric SMILES</span><code title={compound.isomericSmiles}>{compound.isomericSmiles ? `${compound.isomericSmiles.slice(0, 30)}…` : "—"}</code></div></div>{compound.entityNote && <aside className="entity-note"><strong>实体范围提示</strong><span>{compound.entityNote}</span></aside>}</div>
+      <div className="identity-copy"><p className="identity-kicker">COMPOUND PROFILE · PUBCHEM CID {compound.cid}</p><h1>{compound.title}</h1>{confirmedChineseEntry && <p className="chinese-identity-line"><span>中文名称</span><strong>{confirmedChineseEntry.labelZh}</strong><small>CSV 精确关联 CID {confirmedChineseEntry.cid}</small></p>}<p className="synonym-line">{compound.synonyms?.slice(0, 5).join(" · ") || "相关名称整理中"}</p>{compound.iupacName && <p className="iupac-line"><span>IUPAC</span>{compound.iupacName}</p>}<div className="identity-facts"><div><span>分子式</span><strong>{compound.molecularFormula || "—"}</strong></div><div><span>分子量</span><strong>{compound.molecularWeight || "—"}</strong></div><div><span>净电荷</span><strong>{compound.charge ?? "—"}</strong></div><div><span>共价单元</span><strong>{compound.covalentUnitCount ?? "—"}</strong></div><div><span>InChIKey</span><code>{compound.inchiKey || "—"}</code></div><div><span>原子立体中心</span><strong>{compound.definedAtomStereoCount !== undefined || compound.undefinedAtomStereoCount !== undefined ? `${compound.definedAtomStereoCount ?? 0} 已定义 · ${compound.undefinedAtomStereoCount ?? 0} 未定义` : "—"}</strong></div><div><span>Isomeric SMILES</span><code title={compound.isomericSmiles}>{compound.isomericSmiles ? `${compound.isomericSmiles.slice(0, 30)}…` : "—"}</code></div></div>{compound.entityNote && <aside className="entity-note"><strong>实体范围提示</strong><span>{compound.entityNote}</span></aside>}</div>
     </section>
     <div className="coverage-row">{payload.sources.filter((source) => !/EPO|机器抽取|单位模型|智能解析/i.test(source.source)).map((source) => <span className={`status-pill ${source.status}`} key={source.source} title={source.message}><i />{sourceName(source.source)}{typeof source.count === "number" ? ` · ${source.count}` : ""}</span>)}</div>
     {payload.coverageNote && <p className="coverage-note">{payload.coverageNote}</p>}
     <nav className="result-tabs" aria-label="结果分类">{tabs.map(([key, label]) => <button className={tab === key ? "active" : ""} key={key} onClick={() => setTab(key)}>{label}</button>)}</nav>
     <div className="tab-panel">
-      {tab === "overview" && <><div className="metric-grid"><Metric label="实验活性靶点" value={uniqueTargets} note="ChEMBL 活性记录" /><Metric label="功效 / 机制" value={effects.length + targets.length} note="PubMed 文献筛选" /><Metric label="学术论文" value={payload.literature.length} note="PMID / DOI" /><Metric label="临床研究" value={payload.trials.length} note="ClinicalTrials.gov" /></div><Panel title="代表性研究" note="优先展示与当前化合物相关的公开论文"><LiteratureList records={payload.literature.slice(0, 6)} /></Panel></>}
+      {tab === "overview" && <><div className="metric-grid"><Metric label="实验活性靶点" value={uniqueTargets} note="ChEMBL 活性记录" /><Metric label="功效 / 机制" value={effects.length + targets.length} note="PubMed 文献筛选" /><Metric label="学术论文" value={payload.literature.length} note="PMID / DOI" /><Metric label="临床研究" value={payload.trials.length} note="ClinicalTrials.gov" /></div><Panel title="相关功效摘要" note="确认 PubChem CID 后，从 PubMed / Europe PMC 题录与摘要中筛选"><ClaimList records={effects.slice(0, 6)} empty="当前公开文献中尚未筛选出可结构化展示的功效条目。" /></Panel><Panel title="代表性研究" note="优先展示与当前化合物相关的公开论文"><LiteratureList records={payload.literature.slice(0, 6)} /></Panel></>}
       {tab === "effects" && <Panel title="功效研究进展" note="从 PubMed 文献筛选研究功效、模型与终点"><ClaimList records={effects} empty="当前公开文献中尚未筛选出可结构化展示的功效条目。" /></Panel>}
       {tab === "targets" && <><Panel title="靶点活性数据" note="按精确化学实体汇总 ChEMBL 活性记录"><ActivityTable records={payload.bioactivities} /></Panel><Panel title="机制研究与候选靶点" note="来自公开论文的机制信息"><ClaimList records={targets} empty="当前暂无结构化机制条目。" /></Panel></>}
       {tab === "literature" && <Panel title="学术研究成果" note="题录、摘要、PMID、DOI 与原始链接"><LiteratureList records={payload.literature} /></Panel>}

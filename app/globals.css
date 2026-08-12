@@ -236,6 +236,10 @@ img { max-width: 100%; }
 .identity-copy { padding: 30px 34px; }
 .identity-kicker { color: var(--green-dark); font: 650 10px/1 var(--font-geist-mono), monospace; letter-spacing: .14em; }
 .identity-copy h1 { margin: 11px 0 7px; font-size: clamp(30px, 4vw, 48px); letter-spacing: -.045em; }
+.chinese-identity-line { margin: 10px 0 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; color: var(--ink); font-size: 12px; }
+.chinese-identity-line span { color: var(--green-dark); font: 700 9px/1 var(--font-geist-mono), monospace; letter-spacing: .1em; }
+.chinese-identity-line strong { font-size: 14px; }
+.chinese-identity-line small { padding-left: 10px; border-left: 1px solid var(--line); color: var(--muted); font-size: 10px; }
 .identity-copy .synonym-line { color: var(--muted); font-size: 13px; }
 .iupac-line { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
 .iupac-line span { margin-right: 8px; color: var(--green-dark); font: 700 9px/1 var(--font-geist-mono), monospace; letter-spacing: .1em; }
