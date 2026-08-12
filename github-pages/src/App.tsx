@@ -79,8 +79,8 @@ function HomePage() {
       <div className="hero-grid" aria-hidden="true" />
       <div className="hero-copy">
         <p className="eyebrow"><span /> TARGETS · PHYTOCHEMISTRY · AI</p>
-        <h1>中国日化前沿靶点与<br />植物化学数据库大模型</h1>
-        <p className="hero-lead">连接化学结构、生物活性、分子靶点及文献数据</p>
+        <h1>中国日化前沿靶点与<br />植物化学数据库检索平台</h1>
+        <p className="hero-lead">小分子化合物及天然产物化学结构、生物活性、分子靶点及文献专利数据</p>
         <SearchModule />
         <div className="public-scope"><i />中国日化前沿靶点与植物化学数据库大模型算力中心</div>
       </div>
