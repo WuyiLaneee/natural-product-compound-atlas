@@ -139,7 +139,7 @@ img { max-width: 100%; }
 .map-core-wordmark::after { content: ""; width: 86%; height: 1px; position: absolute; left: 8%; bottom: 0; background: linear-gradient(90deg,transparent,#8be0af 25%,#e8fff1 55%,#8be0af 75%,transparent); }
 .map-core-wordmark b,.map-core-wordmark em { font: inherit; font-style: normal; }
 .map-core-wordmark b { color: #fff; transform: skewX(-5deg); }
-.map-core-wordmark em { color: #9fe2ba; }
+.map-core-wordmark em { color: #fff; }
 .map-core span { margin-top: 9px; color: #a8d7bd; font: 700 7px/1.35 var(--font-geist-mono), monospace; letter-spacing: .15em; text-align: center; }
 .map-link { width: 26%; height: 1px; position: absolute; left: 50%; top: 50%; z-index: 2; transform-origin: left center; background: linear-gradient(90deg,rgba(0,166,66,.55),rgba(191,221,205,.38)); }
 .map-link::after { content: ""; width: 7px; height: 7px; position: absolute; right: -3px; top: -3px; border-radius: 50%; background: #9ed1b3; box-shadow: 0 0 0 4px rgba(158,209,179,.1); }
