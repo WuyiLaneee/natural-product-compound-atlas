@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { SiteHeader } from "../components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "平台介绍与数据能力",
-  description: "了解天然产物及小分子化合物检索平台的化学实体识别、多源数据整合、靶点分析、专利洞察与持续更新能力。",
+  title: "数据库大模型介绍与数据能力",
+  description: "了解中国日化前沿靶点与植物化学数据库大模型的化学实体识别、多源数据整合、靶点分析、专利洞察与持续更新能力。",
 };
 
 export default function MethodologyPage() {
@@ -12,8 +12,8 @@ export default function MethodologyPage() {
       <SiteHeader compact />
       <section className="page-hero">
         <div className="eyebrow"><span /> PLATFORM &amp; DATA CAPABILITIES</div>
-        <h1>连接多源科研数据，洞察天然产物与小分子价值</h1>
-        <p>天然产物及小分子化合物检索平台围绕化学身份、功效、靶点、论文、临床研究与专利信息，打造一站式科研数据检索与分析体验。</p>
+        <h1>连接多源科研数据，洞察日化靶点与植物化学价值</h1>
+        <p>中国日化前沿靶点与植物化学数据库大模型围绕化学身份、功效、靶点、论文、临床研究与专利信息，打造一站式科研数据检索与分析体验。</p>
       </section>
       <div className="method-body">
         <div className="method-grid">

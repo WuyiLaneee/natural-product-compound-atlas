@@ -44,10 +44,6 @@ function navigateToCompound(cid: number, query: string) {
   window.location.hash = `/compound/${cid}?q=${encodeURIComponent(query)}`;
 }
 
-function asset(path: string) {
-  return `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
-}
-
 export function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute());
   useEffect(() => {
@@ -62,15 +58,12 @@ export function App() {
 function Header({ compact = false }: { compact?: boolean }) {
   return <header className={`site-header${compact ? " compact" : ""}`}>
     <a href="#/" className="brand-lockup" aria-label="返回首页">
-      <img className="giant-logo" src={asset("brand/giant-biogene.png")} alt="巨子生物" />
-      <span className="brand-cross">×</span>
-      <img className="nwu-logo" src={asset("brand/nwu.png")} alt="西北大学" />
-      <span className="brand-divider" />
-      <span className="product-name">天然产物及小分子<br />化合物检索平台</span>
+      <span className="brand-monogram" aria-hidden="true">AI</span>
+      <span className="product-name">中国日化前沿靶点与<br />植物化学数据库大模型</span>
     </a>
-    <div className="header-edition" title="数据来源：巨子生物AI算力中心">
+    <div className="header-edition" title="数据来源：中国日化前沿靶点与植物化学数据库大模型算力中心">
       <span className="edition-dot" />
-      <span><small>AI COMPUTING CENTER</small><strong>巨子生物AI算力中心</strong></span>
+      <span><small>AI COMPUTING CENTER</small><strong>中国日化前沿靶点与植物化学数据库大模型算力中心</strong></span>
     </div>
   </header>;
 }
@@ -81,11 +74,11 @@ function HomePage() {
     <section className="hero-shell">
       <div className="hero-grid" aria-hidden="true" />
       <div className="hero-copy">
-        <p className="eyebrow"><span /> GIANT BIOGENE · MOLECULAR DISCOVERY</p>
-        <h1>天然产物与小分子化合物<br />智能发现平台</h1>
+        <p className="eyebrow"><span /> TARGETS · PHYTOCHEMISTRY · AI</p>
+        <h1>中国日化前沿靶点与<br />植物化学数据库大模型</h1>
         <p className="hero-lead">连接化学结构、生物活性、分子靶点及文献数据</p>
         <SearchModule />
-        <div className="public-scope"><i />已连接巨子生物AI算力中心</div>
+        <div className="public-scope"><i />中国日化前沿靶点与植物化学数据库大模型算力中心</div>
       </div>
       <div className="intelligence-map" aria-hidden="true">
         <span className="map-kicker">MOLECULAR INTELLIGENCE</span>
@@ -110,7 +103,6 @@ function HomePage() {
     <section className="catalog-section" id="examples">
       <header className="section-heading">
         <div><p className="eyebrow dark"><span /> START WITH A MOLECULE</p><h2>常见化合物示例</h2></div>
-        <p>以下为已确认 PubChem CID 的快速入口。平台不限于这些示例，也可在上方输入其他天然产物或小分子。</p>
       </header>
       <div className="catalog-grid">
         {examples.map((entry, index) => <button className="compound-card" key={entry.cid} onClick={() => navigateToCompound(entry.cid, entry.title)}>
@@ -217,7 +209,7 @@ function CompoundPage({ cid, query }: { cid: number; query: string }) {
 }
 
 function LoadingState() {
-  return <section className="result-loading" aria-live="polite"><div className="loading-orbit" /><p className="eyebrow dark"><span /> LIVE RESEARCH DATA</p><h1>正在链接巨子生物AI数据库</h1><p>正在连接 PubChem、ChEMBL、PubMed / Europe PMC 与 ClinicalTrials.gov</p><div className="loading-sources"><span>化合物身份</span><span>功效论文</span><span>靶点活性</span><span>临床研究</span></div></section>;
+  return <section className="result-loading" aria-live="polite"><div className="loading-orbit" /><p className="eyebrow dark"><span /> LIVE RESEARCH DATA</p><h1>正在连接中国日化前沿靶点与植物化学数据库大模型</h1><p>正在连接 PubChem、ChEMBL、PubMed / Europe PMC 与 ClinicalTrials.gov</p><div className="loading-sources"><span>化合物身份</span><span>功效论文</span><span>靶点活性</span><span>临床研究</span></div></section>;
 }
 
 function ErrorState({ message, retry }: { message: string; retry: () => void }) {
@@ -286,4 +278,4 @@ function sourceName(source: string) {
   return source;
 }
 
-function Footer() { return <footer className="site-footer"><div><img src={asset("brand/giant-biogene.png")} alt="巨子生物" /><span>×</span><img src={asset("brand/nwu.png")} alt="西北大学" /></div><p>巨子生物 × 西北大学 · 天然产物及小分子化合物检索平台</p><small>AI COMPUTING CENTER · 巨子生物AI算力中心</small></footer>; }
+function Footer() { return <footer className="site-footer"><p>中国日化前沿靶点与植物化学数据库</p></footer>; }

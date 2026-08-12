@@ -83,7 +83,7 @@ export function CompoundExplorer({ cid, query }: { cid: string; query?: string }
   const targetClaims = payload?.claims.filter((item) => item.kind === "target" || item.kind === "mechanism") ?? [];
 
   if (error) return <div className="result-error"><strong>数据聚合暂未完成</strong><p>{error}</p><p>请检查化合物编号或稍后重试。</p></div>;
-  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在链接巨子生物AI数据库</strong><p>PubChem · ChEMBL · PubMed / Europe PMC · ClinicalTrials · Patents</p></div></div>;
+  if (!payload) return <div className="result-loading"><div><div className="loading-orbit" /><strong>正在连接中国日化前沿靶点与植物化学数据库大模型算力中心</strong><p>PubChem · ChEMBL · PubMed / Europe PMC · ClinicalTrials · Patents</p></div></div>;
 
   const { compound } = payload;
   const matchedChineseEntry = query ? resolveChineseCompoundName(query) : undefined;

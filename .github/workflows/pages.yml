@@ -44,8 +44,9 @@ jobs:
       - name: Verify static output
         run: |
           test -f dist-pages/index.html
-          test -f dist-pages/brand/giant-biogene.png
-          test -f dist-pages/brand/nwu.png
+          test -f dist-pages/favicon.svg
+          test -f dist-pages/og-china-cosmetics-phytochemistry.png
+          ! grep -RIEq '巨子生物|西北大学|GIANT BIOGENE|Northwest University' dist-pages
           ! grep -Eq '(src|href)="/' dist-pages/index.html
 
       - name: Upload GitHub Pages artifact

@@ -4,9 +4,9 @@ import { SearchForm } from "./components/SearchForm";
 import { SiteHeader } from "./components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "天然产物及小分子化合物检索平台",
+  title: "中国日化前沿靶点与植物化学数据库大模型",
   description:
-    "面向天然产物与小分子化合物研究，汇聚化学身份、活性靶点、功效机制、论文、临床试验与专利信息。",
+    "面向中国日化前沿研究，汇聚天然产物与小分子化合物的化学身份、生物活性、分子靶点、功效机制与文献数据。",
 };
 
 const platformCapabilities = [
@@ -47,11 +47,11 @@ export default function Home() {
       <section className="hero-shell">
         <div className="hero-pattern" aria-hidden="true" />
         <div className="hero-copy">
-          <div className="eyebrow"><span /> GIANT BIOGENE · NATURAL PRODUCT DISCOVERY</div>
-          <h1>天然产物与小分子化合物<br />智能发现平台</h1>
+          <div className="eyebrow"><span /> DAILY CHEMICAL FRONTIERS · PHYTOCHEMISTRY AI</div>
+          <h1>中国日化前沿靶点与<br />植物化学数据库大模型</h1>
           <p className="hero-lead">连接化学结构、生物活性、分子靶点及文献数据</p>
           <SearchForm />
-          <div className="compute-status"><i aria-hidden="true" />已连接巨子生物AI算力中心</div>
+          <div className="compute-status"><i aria-hidden="true" />中国日化前沿靶点与植物化学数据库大模型算力中心</div>
         </div>
         <div className="intelligence-map" aria-hidden="true">
           <span className="map-kicker">MOLECULAR INTELLIGENCE</span>
@@ -84,7 +84,6 @@ export default function Home() {
             <div className="eyebrow dark"><span /> START YOUR DISCOVERY</div>
             <h2 id="discovery-title">从热门化合物出发，<br />进入多维研究视图</h2>
           </div>
-          <p>选择一个代表性天然产物或研究方向，快速查看标准化化合物档案及其关联的科研信息。</p>
         </div>
         <div className="discovery-layout">
           <div className="popular-compounds" aria-label="热门天然产物">
@@ -138,12 +137,7 @@ export default function Home() {
       </section>
 
       <footer className="site-footer">
-        <div className="footer-brand">
-          <img src="/brand/giant-biogene.png" alt="巨子生物" />
-          <span>×</span>
-          <img src="/brand/nwu.png" alt="西北大学" />
-        </div>
-        <p>巨子生物 × 西北大学 · 天然产物及小分子化合物检索平台</p>
+        <p className="footer-database-name">中国日化前沿靶点与植物化学数据库</p>
       </footer>
     </main>
   );

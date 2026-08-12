@@ -11,18 +11,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
-  const previewImage = new URL("/og-natural-product.png", origin).toString();
+  const previewImage = new URL("/og-china-cosmetics-phytochemistry.png", origin).toString();
   return {
     metadataBase: new URL(origin),
-    title: { default: "天然产物及小分子化合物检索平台 · 巨子生物", template: "%s · 巨子生物" },
-    description: "面向天然产物与小分子化合物研究，汇聚化学身份、活性靶点、功效机制、论文、临床试验与专利信息。",
-    icons: { icon: "/brand/nwu.png", shortcut: "/brand/nwu.png" },
+    title: { default: "中国日化前沿靶点与植物化学数据库大模型", template: "%s · 中国日化前沿靶点与植物化学数据库大模型" },
+    description: "面向中国日化前沿研究，汇聚天然产物与小分子化合物的化学结构、生物活性、分子靶点及文献数据。",
+    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
       type: "website",
       locale: "zh_CN",
-      title: "天然产物及小分子化合物检索平台 · 巨子生物",
-      description: "探索天然产物与小分子化合物，连接科研与创新价值。",
-      images: [{ url: previewImage, width: 1730, height: 909, alt: "天然产物及小分子化合物检索平台" }],
+      title: "中国日化前沿靶点与植物化学数据库大模型",
+      description: "连接化学结构、生物活性、分子靶点及文献数据。",
+      images: [{ url: previewImage, width: 1731, height: 909, alt: "中国日化前沿靶点与植物化学数据库大模型" }],
     },
     twitter: { card: "summary_large_image", images: [previewImage] },
   };
