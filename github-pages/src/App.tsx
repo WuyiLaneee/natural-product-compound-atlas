@@ -57,12 +57,7 @@ export function App() {
 
 function Header({ compact = false }: { compact?: boolean }) {
   return <header className={`site-header${compact ? " compact" : ""}`}>
-    <a href="#/" className="brand-lockup" aria-label="返回首页">
-      <span className="brand-monogram" aria-hidden="true">
-        <span className="brand-leaves"><i /><i /></span>
-        <span className="brand-target"><i /></span>
-        <span className="brand-database"><i /><i /><i /></span>
-      </span>
+    <a href="#/" className="brand-lockup" aria-label="中国日化前沿靶点与植物化学数据库大模型，返回首页">
       <span className="product-name">中国日化前沿靶点与<br />植物化学数据库大模型</span>
     </a>
     <div className="header-edition" title="数据来源：中国日化前沿靶点与植物化学数据库大模型算力中心">
@@ -88,7 +83,7 @@ function HomePage() {
         <span className="map-kicker">MOLECULAR INTELLIGENCE</span>
         <i className="map-link link-structure" /><i className="map-link link-activity" />
         <i className="map-link link-target" /><i className="map-link link-literature" />
-        <div className="map-core"><strong>AI</strong><span>DISCOVERY<br />ENGINE</span></div>
+        <div className="map-core"><strong className="map-core-wordmark"><b>A</b><em>I</em></strong><span>DISCOVERY<br />ENGINE</span></div>
         <div className="map-node node-structure"><em>01</em><span><strong>化学结构</strong><small>STRUCTURE</small></span></div>
         <div className="map-node node-activity"><em>02</em><span><strong>生物活性</strong><small>BIOACTIVITY</small></span></div>
         <div className="map-node node-target"><em>03</em><span><strong>分子靶点</strong><small>TARGETS</small></span></div>

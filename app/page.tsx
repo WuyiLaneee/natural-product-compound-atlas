@@ -57,7 +57,7 @@ export default function Home() {
           <span className="map-kicker">MOLECULAR INTELLIGENCE</span>
           <i className="map-link link-structure" /><i className="map-link link-activity" />
           <i className="map-link link-target" /><i className="map-link link-literature" />
-          <div className="map-core"><strong>AI</strong><span>DISCOVERY<br />ENGINE</span></div>
+          <div className="map-core"><strong className="map-core-wordmark"><b>A</b><em>I</em></strong><span>DISCOVERY<br />ENGINE</span></div>
           <div className="map-node node-structure"><em>01</em><span><strong>化学结构</strong><small>STRUCTURE</small></span></div>
           <div className="map-node node-activity"><em>02</em><span><strong>生物活性</strong><small>BIOACTIVITY</small></span></div>
           <div className="map-node node-target"><em>03</em><span><strong>分子靶点</strong><small>TARGETS</small></span></div>
