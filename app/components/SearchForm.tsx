@@ -6,6 +6,9 @@ import {
   findChineseCompoundSuggestions,
   resolveChineseCompoundName,
 } from "@/lib/evidence/chinese-compounds";
+import {
+  findLocalIngredientSuggestions,
+} from "@/lib/evidence/local-ingredients";
 
 type Candidate = {
   cid: number;
@@ -22,6 +25,12 @@ type Candidate = {
   structureUrl?: string;
 };
 
+type IngredientResult = {
+  slug: string;
+  name: string;
+  type: string;
+};
+
 const examples = ["姜黄素", "白藜芦醇", "槲皮素", "咖啡因"] as const;
 
 export function SearchForm({ compact = false, initialValue = "" }: { compact?: boolean; initialValue?: string }) {
@@ -31,16 +40,32 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
   const [message, setMessage] = useState("");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [submittedQuery, setSubmittedQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const suggestions = useMemo(() => {
     if (!query.trim()) return [];
+    const ingredientSuggestions = findLocalIngredientSuggestions(query, 6).map((item) => ({
+      key: `ingredient:${item.slug}`,
+      label: item.identity.name,
+      detail: `${item.identity.type} · ${item.identity.subtype}`,
+      kind: "ingredient" as const,
+    }));
+    if (ingredientSuggestions.length >= 6) return ingredientSuggestions;
     const exactMatch = resolveChineseCompoundName(query);
-    return findChineseCompoundSuggestions(query, 6)
-      .filter((item) => item !== exactMatch);
+    const chemicalSuggestions = findChineseCompoundSuggestions(query, 6)
+      .filter((item) => item !== exactMatch)
+      .map((item) => ({
+        key: `compound:${item.cid}:${item.labelZh}`,
+        label: item.labelZh,
+        detail: `${item.englishName}${item.category ? ` · ${item.category}` : ""}`,
+        kind: "compound" as const,
+      }));
+    return [...ingredientSuggestions, ...chemicalSuggestions].slice(0, 6);
   }, [query]);
 
   async function submit(value = query) {
     const clean = value.trim();
     if (!clean) { setMessage("请输入已收录中文名、英文名、CAS、PubChem CID 或 InChIKey"); return; }
+    setSuggestionsOpen(false);
     setSubmittedQuery(clean);
     setLoading(true); setMessage(""); setCandidates([]);
     try {
@@ -52,6 +77,7 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
       const data = await response.json() as {
         status?: string;
         error?: string;
+        ingredient?: IngredientResult;
         compound?: Candidate;
         candidates?: Candidate[];
         interpretedQuery?: string;
@@ -61,6 +87,10 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
       if (!response.ok) {
         const responseMessage = data.error || "未找到匹配化合物，请检查已收录中文名、英文名、CAS、CID 或 InChIKey";
         throw new Error(responseMessage);
+      }
+      if (data.status === "ingredient" && data.ingredient) {
+        router.push(`/ingredient/${encodeURIComponent(data.ingredient.slug)}?q=${encodeURIComponent(clean)}`);
+        return;
       }
       if (data.status === "resolved" && data.compound) {
         router.push(`/compound/${data.compound.cid}?q=${encodeURIComponent(clean)}`);
@@ -95,18 +125,19 @@ export function SearchForm({ compact = false, initialValue = "" }: { compact?: b
         <input
           id={compact ? "compound-search-compact" : "compound-search"}
           value={query}
-          onChange={(event) => { setQuery(event.target.value); setCandidates([]); setMessage(""); }}
+          onFocus={() => setSuggestionsOpen(true)}
+          onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true); setCandidates([]); setMessage(""); }}
           placeholder="输入中文/英文名、CAS、PubChem CID 或 InChIKey，如：姜黄素"
           autoComplete="off"
         />
         <button type="submit" disabled={loading}>{loading ? "正在解析…" : "开始检索"}<span>→</span></button>
       </form>
-      {suggestions.length > 0 && (
+      {suggestionsOpen && suggestions.length > 0 && (
         <div className="search-suggestions" role="listbox" aria-label="检索建议">
           {suggestions.map((item) => (
-            <button key={item.labelZh} type="button" onClick={() => { setQuery(item.labelZh); void submit(item.labelZh); }}>
-              <strong>{item.labelZh}</strong>
-              <small>{item.englishName}{item.category ? ` · ${item.category}` : ""}</small>
+            <button key={item.key} type="button" onClick={() => { setQuery(item.label); setSuggestionsOpen(false); void submit(item.label); }}>
+              <strong>{item.label}</strong>
+              <small>{item.detail}</small>
             </button>
           ))}
         </div>

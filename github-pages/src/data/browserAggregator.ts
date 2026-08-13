@@ -13,3 +13,11 @@ export {
   findChineseCompoundSuggestions,
   resolveChineseCompoundName,
 } from "../../../lib/evidence/chinese-compounds";
+
+export {
+  LOCAL_INGREDIENT_DATABASE_NAME,
+  findLocalIngredientSuggestions,
+  getLocalIngredientBySlug,
+  resolveLocalIngredient,
+  type LocalIngredientRecord,
+} from "../../../lib/evidence/local-ingredients";

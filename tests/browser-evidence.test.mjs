@@ -304,7 +304,7 @@ test("browser resolver falls back to the reviewed Rb3 CID when PubChem is busy",
   assert.deepEqual(resolution.candidates, [
     { cid: 12912363, title: "GINSENOSIDE RB3" },
   ]);
-  assert.match(resolution.message, /本地审核词表/);
+  assert.match(resolution.message, /中国日化前沿靶点与植物化学数据库/);
   assert.match(resolution.message, /CID 12912363/);
   assert.match(resolution.message, /可先确认该 CID 并继续检索/);
 });

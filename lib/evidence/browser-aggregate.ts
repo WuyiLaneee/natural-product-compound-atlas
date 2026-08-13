@@ -587,8 +587,8 @@ export async function resolveBrowserCompound(
         status: "resolved",
         candidates: [{ cid: fallback.cid, title: fallback.title }],
         message: chineseName
-          ? `已按本地审核词表将${query}关联为${chineseName.englishName}（CID ${chineseName.cid}）。PubChem 身份详情暂未返回，可先确认该 CID 并继续检索；分子式和结构信息将在上游恢复后补充。`
-          : `CID ${fallback.cid} 已在本地审核词表中登记。PubChem 身份详情暂未返回，系统将继续使用该固定 CID 检索。`,
+          ? `已按中国日化前沿靶点与植物化学数据库将${query}关联为${chineseName.englishName}（CID ${chineseName.cid}）。PubChem 身份详情暂未返回，可先确认该 CID 并继续检索；分子式和结构信息将在上游恢复后补充。`
+          : `CID ${fallback.cid} 已在中国日化前沿靶点与植物化学数据库中登记。PubChem 身份详情暂未返回，系统将继续使用该固定 CID 检索。`,
       };
     }
     return {

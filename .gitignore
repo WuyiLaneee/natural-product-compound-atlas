@@ -42,3 +42,7 @@ yarn-error.log*
 /work/
 /.playwright-cli/
 *.tsbuildinfo
+
+# local design-QA captures and development logs
+.local-preview-*.log
+ingredient-implementation-*.png

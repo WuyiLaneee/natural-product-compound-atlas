@@ -131,7 +131,7 @@ test("search API keeps an exact Chinese CID usable during a PubChem outage", asy
     assert.equal(payload.status, "ambiguous");
     assert.equal(payload.queryKind, "name");
     assert.equal(payload.candidates[0].cid, 12912363);
-    assert.match(payload.warning, /本地审核词表/);
+    assert.match(payload.warning, /中国日化前沿靶点与植物化学数据库/);
   } finally {
     delete globalThis.__chineseSearchPubChemUnavailable;
   }

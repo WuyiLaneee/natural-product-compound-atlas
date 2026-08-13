@@ -9,6 +9,7 @@ import {
   findChineseCompoundByCid,
   resolveChineseCompoundName,
 } from "@/lib/evidence/chinese-compounds";
+import { resolveLocalIngredient } from "@/lib/evidence/local-ingredients";
 import { resolvePubChemCompound } from "@/lib/evidence/sources/pubchem";
 import { consumeRateLimit } from "@/lib/storage";
 
@@ -44,6 +45,21 @@ export async function POST(request: Request) {
       { error: "请输入 1–160 个字符的已收录中文名、英文名、CAS、PubChem CID 或完整 InChIKey" },
       { status: 400 },
     );
+  }
+
+  // Curated raw-material dossiers are exact, normalization-equivalent matches.
+  // Resolve them before rate limiting and before any PubChem work so a hit can
+  // never be replaced by a remote chemical-entity response.
+  const ingredient = resolveLocalIngredient(query);
+  if (ingredient) {
+    return Response.json({
+      status: "ingredient",
+      ingredient: {
+        slug: ingredient.slug,
+        name: ingredient.identity.name,
+        type: ingredient.identity.type,
+      },
+    });
   }
 
   const rate = await enforceRateLimit(request);
@@ -84,7 +100,7 @@ export async function POST(request: Request) {
           status: "resolved",
           queryKind: effectiveQueryKind,
           compound: fallbackCandidate,
-          warning: "PubChem 身份详情暂未返回，当前使用本地审核词表中的固定 CID。",
+          warning: "PubChem 身份详情暂未返回，当前使用中国日化前沿靶点与植物化学数据库中的固定 CID。",
           ...queryInterpretation,
         });
       }
@@ -94,7 +110,7 @@ export async function POST(request: Request) {
         candidates: [fallbackCandidate],
         totalAvailable: 1,
         truncated: false,
-        warning: "PubChem 身份详情暂未返回，当前显示本地审核词表中的固定 CID。",
+        warning: "PubChem 身份详情暂未返回，当前显示中国日化前沿靶点与植物化学数据库中的固定 CID。",
         ...queryInterpretation,
       });
     }

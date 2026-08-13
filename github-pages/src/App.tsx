@@ -1,14 +1,27 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { BookOpenText, ChartBar, Database, Flask, Heartbeat, Leaf, Target } from "@phosphor-icons/react";
+import ingredientArchiveUrl from "../../public/ingredient-research-archive.png";
 import {
   aggregateBrowserCompoundEvidence,
+  findLocalIngredientSuggestions,
   findChineseCompoundSuggestions,
+  getLocalIngredientBySlug,
+  LOCAL_INGREDIENT_DATABASE_NAME,
   resolveBrowserCompound,
   resolveChineseCompoundName,
+  resolveLocalIngredient,
   type BrowserCompoundPayload,
   type BrowserCompoundCandidate,
+  type LocalIngredientRecord,
 } from "./data/browserAggregator";
 
-type Route = { page: "home" } | { page: "compound"; cid: number; query: string };
+const ingredientArchiveSrc = (ingredientArchiveUrl as unknown as { src?: string }).src
+  ?? (ingredientArchiveUrl as unknown as string);
+
+type Route =
+  | { page: "home" }
+  | { page: "compound"; cid: number; query: string }
+  | { page: "ingredient"; slug: string; query: string };
 type Tab = "overview" | "effects" | "targets" | "literature" | "trials" | "patents";
 
 interface CuratedExample extends BrowserCompoundCandidate {
@@ -37,11 +50,17 @@ function parseRoute(): Route {
   const [pathname, search = ""] = raw.split("?");
   const match = pathname.match(/^\/compound\/(\d+)\/?$/);
   if (match) return { page: "compound", cid: Number(match[1]), query: new URLSearchParams(search).get("q") || "" };
+  const ingredientMatch = pathname.match(/^\/ingredient\/([a-z0-9-]+)\/?$/);
+  if (ingredientMatch) return { page: "ingredient", slug: ingredientMatch[1], query: new URLSearchParams(search).get("q") || "" };
   return { page: "home" };
 }
 
 function navigateToCompound(cid: number, query: string) {
   window.location.hash = `/compound/${cid}?q=${encodeURIComponent(query)}`;
+}
+
+function navigateToIngredient(slug: string, query: string) {
+  window.location.hash = `/ingredient/${slug}?q=${encodeURIComponent(query)}`;
 }
 
 export function App() {
@@ -52,7 +71,9 @@ export function App() {
     return () => window.removeEventListener("hashchange", update);
   }, []);
 
-  return route.page === "compound" ? <CompoundPage key={route.cid} cid={route.cid} query={route.query} /> : <HomePage />;
+  if (route.page === "compound") return <CompoundPage key={route.cid} cid={route.cid} query={route.query} />;
+  if (route.page === "ingredient") return <IngredientPage key={route.slug} slug={route.slug} query={route.query} />;
+  return <HomePage />;
 }
 
 function Header({ compact = false }: { compact?: boolean }) {
@@ -120,16 +141,24 @@ function SearchModule({ compact = false, initialValue = "" }: { compact?: boolea
   const [message, setMessage] = useState("");
   const [candidates, setCandidates] = useState<BrowserCompoundCandidate[]>([]);
   const [suggestions, setSuggestions] = useState<ReturnType<typeof findChineseCompoundSuggestions>>([]);
+  const [ingredientSuggestions, setIngredientSuggestions] = useState<LocalIngredientRecord[]>([]);
   const [resolving, setResolving] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
 
   async function submit(value = query) {
     const clean = value.trim();
     if (!clean) { setMessage("请输入名称、CAS、PubChem CID 或 InChIKey"); return; }
+    const ingredient = resolveLocalIngredient(clean);
+    if (ingredient) {
+      requestRef.current?.abort();
+      setCandidates([]); setSuggestions([]); setIngredientSuggestions([]); setMessage(""); setResolving(false);
+      navigateToIngredient(ingredient.slug, clean);
+      return;
+    }
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    setCandidates([]); setSuggestions([]); setMessage(""); setResolving(true);
+    setCandidates([]); setSuggestions([]); setIngredientSuggestions([]); setMessage(""); setResolving(true);
     try {
       const resolution = await resolveBrowserCompound(clean, { signal: controller.signal });
       if (resolution.candidates.length === 1 && (resolution.queryKind === "cid" || resolution.queryKind === "inchikey")) {
@@ -161,18 +190,22 @@ function SearchModule({ compact = false, initialValue = "" }: { compact?: boolea
           setQuery(nextQuery);
           setCandidates([]);
           setMessage("");
+          setIngredientSuggestions(findLocalIngredientSuggestions(nextQuery));
           setSuggestions(findChineseCompoundSuggestions(nextQuery));
         }}
         placeholder="输入中文名、英文名、CAS、CID 或 InChIKey，如：槲皮素"
         autoComplete="off"
         role="combobox"
         aria-autocomplete="list"
-        aria-expanded={suggestions.length > 0}
-        aria-controls={suggestions.length > 0 ? `${compact ? "compact" : "main"}-chinese-suggestions` : undefined}
+        aria-expanded={ingredientSuggestions.length + suggestions.length > 0}
+        aria-controls={ingredientSuggestions.length + suggestions.length > 0 ? `${compact ? "compact" : "main"}-chinese-suggestions` : undefined}
       />
       <button type="submit" disabled={resolving}>{resolving ? "解析中" : "开始检索"} <span>→</span></button>
     </form>
-    {suggestions.length > 0 && <div className="search-suggestions" id={`${compact ? "compact" : "main"}-chinese-suggestions`} role="listbox" aria-label="中文化合物名称建议">
+    {ingredientSuggestions.length + suggestions.length > 0 && <div className="search-suggestions" id={`${compact ? "compact" : "main"}-chinese-suggestions`} role="listbox" aria-label="中文化合物与原料名称建议">
+      {ingredientSuggestions.map((item) => <button type="button" role="option" aria-selected="false" key={`ingredient:${item.slug}`} onClick={() => { setQuery(item.identity.name); submit(item.identity.name); }}>
+        <strong>{item.identity.name}</strong><span>{item.identity.subtype}</span>
+      </button>)}
       {suggestions.map((item) => <button type="button" role="option" aria-selected="false" key={`${item.labelZh}:${item.englishName}`} onClick={() => { setQuery(item.labelZh); submit(item.labelZh); }}>
         <strong>{item.labelZh}</strong><span>{item.englishName}</span>
       </button>)}
@@ -205,6 +238,93 @@ function CompoundPage({ cid, query }: { cid: number; query: string }) {
   return <main className="result-page"><Header compact /><section className="result-top"><SearchModule compact initialValue={query} /></section><div className="result-shell">
     {error ? <ErrorState message={error} retry={retry} /> : !payload ? <LoadingState /> : <CompoundResult payload={payload} query={query} tab={tab} setTab={setTab} />}
   </div><Footer /></main>;
+}
+
+function IngredientPage({ slug, query }: { slug: string; query: string }) {
+  const record = getLocalIngredientBySlug(slug);
+  return <main className="result-page ingredient-result-page">
+    <Header compact />
+    <section className="result-top"><SearchModule compact initialValue={query || record?.identity.name || ""} /></section>
+    <div className="result-shell ingredient-result-shell">
+      {record ? <IngredientResult record={record} /> : <section className="result-error" role="alert"><span className="error-mark">!</span><div><p className="eyebrow dark"><span /> RECORD STATUS</p><h1>未找到该原料条目</h1><p>该条目可能已更新或地址无效，请返回首页重新检索。</p><div className="error-actions"><a href="#/">返回检索首页</a></div></div></section>}
+    </div>
+    <Footer />
+  </main>;
+}
+
+function IngredientResult({ record }: { record: LocalIngredientRecord }) {
+  const hasMechanismClues = record.mechanismClues.some((clue) => clue.name !== "具体分子靶点");
+  return <>
+    <a href="#/" className="back-link">← 返回检索首页</a>
+    <p className="ingredient-breadcrumb">搜索结果 <span>/</span> 原料研究档案</p>
+    <section className="ingredient-identity-panel">
+      <div className="ingredient-ribbon"><span>原料档案</span></div>
+      <figure className="ingredient-archive-visual"><img src={ingredientArchiveSrc} alt="植物化学研究档案装饰图" /></figure>
+      <div className="ingredient-identity-copy">
+        <p className="identity-kicker">INGREDIENT RESEARCH PROFILE</p>
+        <h1>{record.identity.name}</h1>
+        <div className="ingredient-identity-tags"><span>{record.identity.type}</span><span>{record.identity.subtype}</span></div>
+        <p>{record.identity.summary}</p>
+      </div>
+      <aside className="ingredient-source-card">
+        <span className="source-seal" aria-hidden="true">DB</span>
+        <div><small>DATA SOURCE</small><strong>{LOCAL_INGREDIENT_DATABASE_NAME}</strong><p>{record.source.recordType}</p></div>
+      </aside>
+    </section>
+
+    <div className="ingredient-layout">
+      <section className="ingredient-knowledge-card">
+        <header><Leaf className="phosphor-section-icon" aria-hidden="true" /><div><p>KNOWLEDGE GRAPH</p><h2>知识图谱概览</h2></div></header>
+        <div className="knowledge-flow" aria-label="原料知识关系">
+          <KnowledgeNode index="01" label={record.identity.name} caption="原料名称" />
+          <span className="flow-arrow" aria-hidden="true">→</span>
+          <KnowledgeNode index="02" label={record.functionalFactors[0]?.name || "功能因子"} caption="功能因子" />
+          <span className="flow-arrow" aria-hidden="true">→</span>
+          <KnowledgeNode index="03" label="代表性成分" caption={`${record.representativeComponents.length} 项`} />
+          <span className="flow-arrow" aria-hidden="true">→</span>
+          <KnowledgeNode index="04" label="研究功效" caption={`${record.researchEffects.length} 项`} />
+          {hasMechanismClues && <><span className="flow-arrow" aria-hidden="true">→</span><KnowledgeNode index="05" label="机制线索" caption={`${record.mechanismClues.length} 项`} /></>}
+        </div>
+
+        <div className="ingredient-detail-grid">
+          <IngredientSection title="功能因子" index="01" icon={<Leaf weight="duotone" />}><IngredientTags items={record.functionalFactors} /></IngredientSection>
+          <IngredientSection title="代表性成分" index="02" icon={<Flask weight="duotone" />}><IngredientTags items={record.representativeComponents} /></IngredientSection>
+          <IngredientSection title="研究功效" index="03" icon={<Heartbeat weight="duotone" />}><IngredientTags items={record.researchEffects} tone="green" /></IngredientSection>
+          {hasMechanismClues && <IngredientSection title="靶点与机制线索" index="04" icon={<Target weight="duotone" />}><MechanismList items={record.mechanismClues.filter((clue) => clue.name !== "具体分子靶点")} /></IngredientSection>}
+          <IngredientSection title="含量或组成信息" index="05" icon={<ChartBar weight="duotone" />}><CompositionList items={record.composition} /></IngredientSection>
+        </div>
+        <IngredientSection title="相关文献" index="06" icon={<BookOpenText weight="duotone" />} className="ingredient-literature-section"><IngredientLiterature items={record.literature.records} message={record.literature.message} /></IngredientSection>
+      </section>
+
+      <aside className="ingredient-side-column">
+        <section className="ingredient-side-card"><header><Database className="phosphor-section-icon" weight="duotone" aria-hidden="true" /><h2>数据来源标识</h2></header><p className="side-source-name">{LOCAL_INGREDIENT_DATABASE_NAME}</p><span className="database-status"><i />已收录原料研究档案</span></section>
+      </aside>
+    </div>
+  </>;
+}
+
+function IngredientLiterature({ items, message }: { items: LocalIngredientRecord["literature"]["records"]; message: string }) {
+  return <div className="ingredient-inline-literature"><p>{message}</p>{items.map((item) => <article key={`${item.title}:${item.year}`}><span>{item.relationship}</span><h4>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title} ↗</a> : item.title}</h4><small>{item.journal} · {item.year}</small><div className="ingredient-literature-effects"><b>对应功效</b>{item.effects.map((effect) => <i key={effect}>{effect}</i>)}</div>{(item.pmid || item.doi || item.sourceNote) && <small>{item.pmid ? `PMID ${item.pmid}` : item.doi ? `DOI ${item.doi}` : item.sourceNote}</small>}</article>)}</div>;
+}
+
+function KnowledgeNode({ index, label, caption }: { index: string; label: string; caption: string }) {
+  return <div className="knowledge-node"><span>{index}</span><strong>{label}</strong><small>{caption}</small></div>;
+}
+
+function IngredientSection({ title, index, icon, children, className = "" }: { title: string; index: string; icon: ReactNode; children: ReactNode; className?: string }) {
+  return <section className={`ingredient-detail-section ${className}`}><header><span>{index}</span><i>{icon}</i><h3>{title}</h3></header>{children}</section>;
+}
+
+function IngredientTags({ items, tone = "plain" }: { items: readonly { name: string; details?: string }[]; tone?: "plain" | "green" }) {
+  return <div className={`ingredient-tag-list ${tone}`}>{items.map((item) => <div key={`${item.name}:${item.details || ""}`}><strong>{item.name}</strong>{item.details && <small>{item.details}</small>}</div>)}</div>;
+}
+
+function MechanismList({ items }: { items: LocalIngredientRecord["mechanismClues"] }) {
+  return <div className="mechanism-list">{items.map((item) => <article key={`${item.name}:${item.details}`}><strong>{item.name}</strong><p>{item.details}</p><small>{item.evidenceBoundary}</small></article>)}</div>;
+}
+
+function CompositionList({ items }: { items: LocalIngredientRecord["composition"] }) {
+  return <div className="composition-list">{items.map((item) => <article key={`${item.label}:${item.value}`}><span>{item.label}</span><strong>{item.value}</strong>{item.basis && <small>{item.basis}</small>}{item.boundary && <p>{item.boundary}</p>}</article>)}</div>;
 }
 
 function LoadingState() {
