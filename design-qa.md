@@ -1,6 +1,6 @@
 # Design QA — Local ingredient knowledge archive
 
-**Reference visual:** selected option 3, `C:\Users\frdgh\.codex\generated_images\019fef84-aa74-72d3-9b14-9f9dfa380a17\exec-15342cd4-bfbd-4abe-93a0-36902e84729c.png`.
+**Reference visual:** selected option 3 from the approved local design comparison.
 
 **Implementation checks:** desktop, lower-section and 390 px mobile captures were reviewed locally during QA.
 

@@ -18,21 +18,21 @@ async function render(pathname = "/") {
   );
 }
 
-test("server-renders the phytochemistry database homepage without legacy branding", async () => {
+test("server-renders the showcase login gate without legacy branding", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /<html lang="zh-CN">/i);
-  assert.match(html, /中国日化前沿靶点与植物化学数据库大模型/);
-  assert.match(html, /中国日化前沿靶点与植物化学数据库大模型算力中心/);
-  assert.match(html, /CHINA FRONTIER DATABASE FOR PERSONAL CARE TARGETS &amp; PHYTOCHEMISTRY/);
-  assert.match(html, /PubChem/);
-  assert.match(html, /ChEMBL/);
-  assert.match(html, /Europe PMC/);
-  assert.match(html, /ClinicalTrials\.gov/);
-  assert.match(html, /汇聚科研信息/);
+  assert.match(html, /中国日化前沿/);
+  assert.match(html, /靶点与植物化学/);
+  assert.match(html, /数据库检索平台/);
+  assert.match(html, /DATABASE ACCESS/);
+  assert.match(html, /登录检索平台/);
+  assert.match(html, /name="username"/);
+  assert.match(html, /name="password"/);
+  assert.doesNotMatch(html, /请输入平台展示账号与密码|>ID<|>••</);
   assert.doesNotMatch(html, /巨子生物|西北大学|GIANT BIOGENE|Northwest University/i);
   assert.doesNotMatch(html, /AUDITABLE BY DESIGN|不是黑箱摘要|把“提及”与“证明”分开|不代表医学建议|机器抽取结果会明确/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/i);
